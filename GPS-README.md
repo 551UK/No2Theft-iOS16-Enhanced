@@ -17,3 +17,15 @@ Use the manual GitHub Actions workflow on the default branch to build the `gps-t
 **Important limitations:** This add-on has no on-device validation yet. Hooks may not attach if AFNetworking or INTULocationManager have not loaded before its constructor runs, in which case the original IP email path may remain active. No2Theft might have other email paths not intercepted here. Verify the source of every location alert before relying on this tweak, and keep an uninstall/recovery plan given prior Safe Mode and passcode lockout reports. Do not deliberately enter incorrect passcodes to test.
 
 **Privacy:** This repository must not contain the original No2Theft binary, the SMTP password, account details or personal location logs.
+
+## Single Sileo package (Email + GPS Fix)
+
+For personal testing, you can combine an **already working Email Fix DEB** and the generated **GPS add-on DEB** into one installable package using:
+
+```bash
+bash scripts/make-combined-deb.sh No2Theft-iOS16-Email-Fix-rootless.deb No2Theft-iOS16-GPS-Only-Experimental-rootless.deb
+```
+
+The result is titled `No2Theft iOS 16 (Email + GPS Fix)` in Sileo and retains the existing No2Theft package identifier and preferences. It declares a conflict/replacement with the separately installed GPS add-on so the older add-on must be removed during installation. Both compiled dylibs remain exactly unchanged; this is a **single package**, not a fully merged binary.
+
+The repository does not distribute the underlying No2Theft binary, which must be supplied separately by its owner. The GPS add-on is experimental and has not yet been validated to produce a precise live GPS pin on a physical iOS 16 device. Avoid passcode-triggered tests given the prior lockout.
