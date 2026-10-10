@@ -6,6 +6,7 @@ include $(THEOS)/makefiles/common.mk
 
 BUNDLE_NAME := N2TSMSNumbers
 N2TSMSNumbers_FILES := SMSNumbersController.m
+N2TSMSNumbers_RESOURCE_FILES := SMSNumbers.plist
 N2TSMSNumbers_INSTALL_PATH := /Library/PreferenceBundles
 N2TSMSNumbers_FRAMEWORKS := UIKit Foundation
 N2TSMSNumbers_PRIVATE_FRAMEWORKS := Preferences
