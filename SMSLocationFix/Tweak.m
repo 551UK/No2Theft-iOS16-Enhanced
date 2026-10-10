@@ -14,8 +14,8 @@ extern char **environ;
 
 // Works alongside the stock No2Theft 1.3.5 binary. It never creates an
 // SMS, changes recipients, or reads the Messages database. It modifies only
-// a No2Theft alert already queued with an invalid 0,0 Maps link or
-// an IP-based Maps link from the SMS remote command.
+// a No2Theft alert already queued with any original Maps link.
+// The replacement location ALWAYS comes from the authorized GPS helper.
 static BOOL (*originalSMS)(id, SEL, id, id, id);
 static NSRegularExpression *mapExpression;
 static NSMutableArray<NSDictionary *> *pendingMessages;
@@ -38,22 +38,15 @@ static BOOL IsNo2TheftSMS(NSString *message) {
            [message containsString:@"Your password was inputted wrong several times or might have initiated a remote command"];
 }
 
+// For No2Theft's own alerts ALWAYS replace the original map URL, whether
+// it is 0,0, London from IP location, or any other coordinates. Never trust
+// the original location when an on-demand GPS result can be obtained.
 static NSRange MapRangeToCorrect(NSString *message) {
+    if (!mapExpression || ![message isKindOfClass:NSString.class])
+        return NSMakeRange(NSNotFound,0);
     NSTextCheckingResult *match=[mapExpression firstMatchInString:message
         options:0 range:NSMakeRange(0,message.length)];
-    if(!match || match.range.location==NSNotFound) return NSMakeRange(NSNotFound,0);
-    // The remote SMS command uses IP-derived location coordinates (often
-    // London). Replace its map link even when it is not 0,0.
-    if ([message containsString:@"SMS remote action has been received"])
-        return match.range;
-    NSString *link=[message substringWithRange:match.range];
-    NSRange query=[link rangeOfString:@"?q=" options:NSCaseInsensitiveSearch];
-    if(query.location==NSNotFound) return NSMakeRange(NSNotFound,0);
-    NSString *coordinates=[link substringFromIndex:NSMaxRange(query)];
-    double lat=999,lon=999;
-    if(sscanf(coordinates.UTF8String,"%lf,%lf",&lat,&lon)==2 &&
-        fabs(lat)<0.0000001 && fabs(lon)<0.0000001) return match.range;
-    return NSMakeRange(NSNotFound,0);
+    return match ? match.range : NSMakeRange(NSNotFound,0);
 }
 
 static NSString *AllowedURL(id value) {
@@ -113,10 +106,12 @@ static void DeliverPending(NSString *url) {
         if(center==(id)NSNull.null)center=nil;
         id recipient=entry[@"recipient"];
         SEL selector=@selector(sendSMSWithText:serviceCenter:toAddress:);
-        NSRange bad=MapRangeToCorrect(message);
-        if(bad.location!=NSNotFound) {
+        if(MapRangeToCorrect(message).location!=NSNotFound) {
             NSString *replacement=url?:@"GPS location unavailable";
-            message=[message stringByReplacingCharactersInRange:bad withString:replacement];
+            // Replace ALL original map URLs, not just 0,0 or IP-based London.
+            message=[mapExpression stringByReplacingMatchesInString:message
+                options:0 range:NSMakeRange(0,message.length)
+                withTemplate:replacement];
         }
         // Call the original implementation, not this hook, for exactly
         // the recipient selected by the original No2Theft binary.
@@ -155,14 +150,14 @@ static BOOL HookSMS(id self,SEL selector,id text,id serviceCenter,id recipient) 
     if(![text isKindOfClass:NSString.class] ||
        ![recipient isKindOfClass:NSString.class] ||
        !IsNo2TheftSMS(text) ||
-       ZeroMapRange(text).location==NSNotFound)
+       MapRangeToCorrect(text).location==NSNotFound)
         return originalSMS(self,selector,text,serviceCenter,recipient);
     NSDictionary *entry=@{@"receiver":self,@"message":[text copy],
                           @"service":serviceCenter?:NSNull.null,
                           @"recipient":[recipient copy]};
     LogStage([text containsString:@"SMS remote action has been received"]
-                 ? @"intercepted_remote_ip_location"
-                 : @"intercepted_zero_location");
+                 ? @"intercepted_remote_location"
+                 : @"intercepted_alarm_location");
     if([NSThread isMainThread])QueueSMSOnMain(entry);
     else dispatch_async(dispatch_get_main_queue(),^{QueueSMSOnMain(entry);});
     // Queued. Actual send result isn't available synchronously.
