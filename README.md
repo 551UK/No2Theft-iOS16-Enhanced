@@ -1,7 +1,13 @@
-# No2Theft iOS 16 — GPS Email Location Fix
+# No2Theft Enhanced — iOS 16
 
-An experimental **rootless Dopamine iOS 16** companion tweak that replaces the IP-derived map coordinates in No2Theft alert emails with an iPhone GPS fix.
+No2Theft Enhanced adds extra theft protection to jailbroken iPhones running **iOS 16 with Dopamine rootless**.
 
-The working Gmail Email Fix package remains separate and unchanged. The GPS add-on is not yet compiled or tested on-device. See the `gps-test` branch for source and a manual build workflow.
+- Theft alarm with custom PIN to disarm it.
+- Remote SMS command to trigger the alarm.
+- Optional repeating SOS flashlight during an alarm.
+- Fixed Gmail email alerts with security photos.
+- Accurate GPS location and Google Maps links in alert emails.
 
-**Important:** This repository contains only original companion-source code. It does not contain the original No2Theft binary, account details, app passwords, or private location information.
+**Latest stable version:** v1.3.5 · **Made by 551UK**
+
+[Download the DEB from Releases](https://github.com/551UK/No2Theft-iOS16-Fixed/releases/tag/v1.3.5).
