@@ -28,7 +28,7 @@ done
 cat > "$WORK/combined/DEBIAN/control" <<'EOF'
 Package: xyz.cypwn.no2theft16
 Name: No2Theft iOS 16 (Email + GPS Fix)
-Version: 1.1+smtp-test4+gps1
+Version: 1.1+smtp-test4+gps2
 Architecture: iphoneos-arm64
 Maintainer: 551UK
 Author: elias; GPS add-on by 551UK
