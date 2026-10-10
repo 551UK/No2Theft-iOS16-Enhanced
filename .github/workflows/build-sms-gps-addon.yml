@@ -52,13 +52,13 @@ jobs:
           with tarfile.open(fileobj=io.BytesIO(c), mode='r:*') as tf:
               control=next(tf.extractfile(x).read().decode() for x in tf if x.name.lstrip('./')=='control')
           assert 'Package: uk.551.no2theft.smslocationfix' in control
-          assert 'Version: 0.1.0' in control
+          assert 'Version: 0.1.1' in control
           print('Validated standalone addon, contents:',names)
           PY
           done
       - name: Upload experimental DEB only to Actions artifact
         uses: actions/upload-artifact@v4
         with:
-          name: No2Theft-SMS-GPS-Addon-v0.1.0-Experimental
+          name: No2Theft-SMS-GPS-Addon-v0.1.1-Experimental
           path: SMSLocationFix/packages/*.deb
           if-no-files-found: error
