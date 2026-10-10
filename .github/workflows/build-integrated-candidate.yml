@@ -126,13 +126,51 @@ jobs:
           assert n==1
           txt=re.sub(r'^Description:.*(?:\n [^\n]*)*',
                      'Description: No2Theft iOS 16 integrated experimental candidate.\n Original stable alarm, PIN, email, GPS and SOS components preserved.\n Adds SMS location correction, photo exception guard and SMS recipient submenu.',txt,count=1,flags=re.M)
-          for pkg in ('uk.551.no2theft.smslocationfix','uk.551.no2theft.photocrashguard','uk.551.no2theft.smsnumbersprefs'):
-              pass
-          # The integrated package replaces previously installed standalone add-ons,
-          # avoiding dpkg file-ownership conflicts during an upgrade.
-          conflicts='uk.551.no2theft.smslocationfix, uk.551.no2theft.photocrashguard, uk.551.no2theft.smsnumbersprefs'
-          if 'Conflicts:' not in txt: txt+='\nConflicts: '+conflicts
-          if 'Replaces:' not in txt: txt+='\nReplaces: '+conflicts
+          # Keep the original package's existing conflicts/replacements and
+          # extend them to cover our three previously shipped standalone add-ons.
+          addons=('uk.551.no2theft.smslocationfix','uk.551.no2theft.photocrashguard','uk.551.no2theft.smsnumbersprefs')
+          for field in ('Conflicts','Replaces'):
+              match=re.search(r'^'+field+r': *(.*)
+          control.write_text(txt.rstrip()+'\n')
+          subprocess.run(['dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),'No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb'],check=True)
+          stable_dir=Path('stable-extract')
+          subprocess.run(['dpkg-deb','-x','stable.deb',str(stable_dir)],check=True)
+          for p in stable_dir.rglob('*'):
+              if not p.is_file():continue
+              rel=p.relative_to(stable_dir)
+              if rel.as_posix()=='var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist':continue
+              assert (root/rel).read_bytes()==p.read_bytes(),f'Changed stable binary/resource: {rel}'
+          print('Verified original payload unchanged except Settings submenu')
+          PY
+          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: No2Theft-Integrated-Candidate-UNTESTED
+          path: No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb
+          if-no-files-found: error
+,txt,re.M)
+              values=[v.strip() for v in match.group(1).split(',')] if match else []
+              values.extend(x for x in addons if x not in values)
+              line=field+': '+', '.join(values)
+              txt=re.sub(r'^'+field+r':.*
+          control.write_text(txt.rstrip()+'\n')
+          subprocess.run(['dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),'No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb'],check=True)
+          stable_dir=Path('stable-extract')
+          subprocess.run(['dpkg-deb','-x','stable.deb',str(stable_dir)],check=True)
+          for p in stable_dir.rglob('*'):
+              if not p.is_file():continue
+              rel=p.relative_to(stable_dir)
+              if rel.as_posix()=='var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist':continue
+              assert (root/rel).read_bytes()==p.read_bytes(),f'Changed stable binary/resource: {rel}'
+          print('Verified original payload unchanged except Settings submenu')
+          PY
+          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: No2Theft-Integrated-Candidate-UNTESTED
+          path: No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb
+          if-no-files-found: error
+,lambda m:line,txt,count=1,flags=re.M) if match else txt.rstrip()+'\n'+line+'\n'
           control.write_text(txt.rstrip()+'\n')
           subprocess.run(['dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),'No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb'],check=True)
           stable_dir=Path('stable-extract')
