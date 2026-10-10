@@ -14,7 +14,8 @@ extern char **environ;
 
 // Works alongside the stock No2Theft 1.3.5 binary. It never creates an
 // SMS, changes recipients, or reads the Messages database. It modifies only
-// a No2Theft alert already queued with a known-bad 0,0 Maps link.
+// a No2Theft alert already queued with an invalid 0,0 Maps link or
+// an IP-based Maps link from the SMS remote command.
 static BOOL (*originalSMS)(id, SEL, id, id, id);
 static NSRegularExpression *mapExpression;
 static NSMutableArray<NSDictionary *> *pendingMessages;
@@ -37,10 +38,14 @@ static BOOL IsNo2TheftSMS(NSString *message) {
            [message containsString:@"Your password was inputted wrong several times or might have initiated a remote command"];
 }
 
-static NSRange ZeroMapRange(NSString *message) {
+static NSRange MapRangeToCorrect(NSString *message) {
     NSTextCheckingResult *match=[mapExpression firstMatchInString:message
         options:0 range:NSMakeRange(0,message.length)];
     if(!match || match.range.location==NSNotFound) return NSMakeRange(NSNotFound,0);
+    // The remote SMS command uses IP-derived location coordinates (often
+    // London). Replace its map link even when it is not 0,0.
+    if ([message containsString:@"SMS remote action has been received"])
+        return match.range;
     NSString *link=[message substringWithRange:match.range];
     NSRange query=[link rangeOfString:@"?q=" options:NSCaseInsensitiveSearch];
     if(query.location==NSNotFound) return NSMakeRange(NSNotFound,0);
@@ -108,7 +113,7 @@ static void DeliverPending(NSString *url) {
         if(center==(id)NSNull.null)center=nil;
         id recipient=entry[@"recipient"];
         SEL selector=@selector(sendSMSWithText:serviceCenter:toAddress:);
-        NSRange bad=ZeroMapRange(message);
+        NSRange bad=MapRangeToCorrect(message);
         if(bad.location!=NSNotFound) {
             NSString *replacement=url?:@"GPS location unavailable";
             message=[message stringByReplacingCharactersInRange:bad withString:replacement];
@@ -155,7 +160,9 @@ static BOOL HookSMS(id self,SEL selector,id text,id serviceCenter,id recipient) 
     NSDictionary *entry=@{@"receiver":self,@"message":[text copy],
                           @"service":serviceCenter?:NSNull.null,
                           @"recipient":[recipient copy]};
-    LogStage(@"intercepted_zero_location");
+    LogStage([text containsString:@"SMS remote action has been received"]
+                 ? @"intercepted_remote_ip_location"
+                 : @"intercepted_zero_location");
     if([NSThread isMainThread])QueueSMSOnMain(entry);
     else dispatch_async(dispatch_get_main_queue(),^{QueueSMSOnMain(entry);});
     // Queued. Actual send result isn't available synchronously.
