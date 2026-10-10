@@ -1,4 +1,4 @@
-name: No2Theft Single-DEB Integration (test)
+name: Build No2Theft Integrated SMS Settings v3 (test)
 on:
   push:
     branches: [experimental-sms-location-ios16]
@@ -15,9 +15,9 @@ jobs:
         with:
           theos-src: https://github.com/theos/theos
           theos-sdks: https://github.com/theos/sdks
-      - name: Install packaging tools
+      - name: Install package utilities
         run: brew install dpkg
-      - name: Disable development-only diagnostics in build copies
+      - name: Remove development diagnostics in build worktree
         shell: bash
         run: |
           python3 - <<'PY'
@@ -35,109 +35,105 @@ jobs:
           b=t.index('\nstatic void GuardedTakePicture',a)
           t=t[:a]+'static void Record(NSString *status,NSString *exceptionName) { (void)status; (void)exceptionName; }\n'+t[b:]
           t=t.replace('static NSString *const statusPath=@"/var/mobile/Library/Preferences/uk.551.no2theft.photoguard.status.plist";','')
-          t=t.replace('        NSLog(@"[No2Theft Photo Guard] Caught exception during legacy photo capture: %@","\n              exception.name?:@"unknown");\n','')
           t=t.replace('        NSLog(@"[No2Theft Photo Guard] Caught exception during legacy photo capture: %@",\n              exception.name?:@"unknown");\n','')
           assert '[No2Theft Photo Guard] Caught exception' not in t
           p.write_text(t)
-          # Do not modify SMSNumbersPrefs at all: it is the minimal,
-          # isolated two-number controller that previously worked.
           PY
-      - name: Compile only GPS correction, photo guard, and two-number controller
+      - name: Build only working GPS and Photo Guard fixes
         shell: bash
         run: |
-          for d in SMSLocationFix PhotoCrashGuard SMSNumbersPrefs; do
-            (cd "$d" && make clean package FINALPACKAGE=1)
+          for dir in SMSLocationFix PhotoCrashGuard; do
+            (cd "$dir" && make clean package FINALPACKAGE=1)
           done
-      - name: Retrieve and authenticate known-good stable base
+      - name: Fetch and validate original stable No2Theft v1.3.5
         shell: bash
         run: |
           curl --fail --location --retry 3 --silent --show-error \
             "https://github.com/551UK/No2Theft-iOS16-Enhanced/releases/download/v1.3.5/No2Theft-Enhanced-v1.3.5.deb" -o stable.deb
           echo "e3d22e1dd8f407eb4c43a67f78b8956779c36f6f2e24d73e39d9e3609066a0ff  stable.deb" | shasum -a 256 -c
-      - name: Assemble and audit a single DEB
+      - name: Combine one DEB with inline SMS Settings
         shell: bash
         run: |
           python3 - <<'PY'
-          import subprocess,glob,plistlib,re,shutil
+          import glob,plistlib,re,shutil,subprocess
           from pathlib import Path
-          def run(*a): subprocess.run(a,check=True)
-          run('dpkg-deb','-R','stable.deb','assembled')
+          def run(*args): subprocess.run(args,check=True)
           root=Path('assembled')
-          for d in ('SMSLocationFix','PhotoCrashGuard','SMSNumbersPrefs'):
-              debs=glob.glob(d+'/packages/*.deb')
-              assert len(debs)==1,(d,debs)
-              sub=Path('extracted-'+d)
-              run('dpkg-deb','-x',debs[0],str(sub))
-              for p in sub.rglob('*'):
-                  if not p.is_file():continue
-                  rel=p.relative_to(sub)
-                  # DO NOT register any standalone PreferenceLoader row.
-                  if 'PreferenceLoader/Preferences/' in str(rel):continue
+          run('dpkg-deb','-R','stable.deb',str(root))
+          for name in ('SMSLocationFix','PhotoCrashGuard'):
+              debs=glob.glob(name+'/packages/*.deb')
+              assert len(debs)==1,(name,debs)
+              stage=Path('extract-'+name)
+              run('dpkg-deb','-x',debs[0],str(stage))
+              for p in stage.rglob('*'):
+                  if not p.is_file(): continue
+                  rel=p.relative_to(stage)
                   dest=root/rel
-                  assert not dest.exists(), 'Conflicting original file '+str(rel)
+                  assert not dest.exists(),str(dest)
                   dest.parent.mkdir(parents=True,exist_ok=True)
                   shutil.copy2(p,dest)
-          prefs=root/'var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist'
-          original_bytes=prefs.read_bytes()
-          obj=plistlib.loads(original_bytes)
-          entries=obj['items']
-          assert any(x.get('key')=='pinEnable' for x in entries)
-          assert any(x.get('key')=='emailRemote' for x in entries)
-          assert any(x.get('key')=='sendEmail' for x in entries)
-          assert all(x.get('key') not in ('firstNumber','secondNumber','sendSMS','smsRemote') for x in entries), 'Base already patched'
-          old_entries=list(entries)
-          # At the END ONLY. Do not reorder existing rows or add SMS toggles.
-          entries.append({'cell':'PSGroupCell','label':'SMS Recipients'})
-          entries.append({'cell':'PSLinkCell','label':'Edit SMS Numbers',
-                          'bundle':'N2TSMSNumbers','detail':'N2TSMSNumbersController',
-                          'isController':True})
-          assert entries[:len(old_entries)]==old_entries
-          prefs.write_bytes(plistlib.dumps(obj,fmt=plistlib.FMT_XML,sort_keys=False))
-          bundle=root/'var/jb/Library/PreferenceBundles/N2TSMSNumbers.bundle'
-          assert (bundle/'N2TSMSNumbers').is_file()
-          fields=plistlib.loads((bundle/'SMSNumbers.plist').read_bytes())['items']
-          assert [x['key'] for x in fields if x.get('key')]==['firstNumber','secondNumber']
-          assert not list(root.rglob('N2TSMSNumbers.plist')), 'Separate Settings registration remains'
-          for lib in ('N2TSMSLocationFix','N2TPhotoCrashGuard'):
-              directory=root/'var/jb/Library/MobileSubstrate/DynamicLibraries'
-              assert (directory/(lib+'.dylib')).is_file(),lib
-              assert (directory/(lib+'.plist')).is_file(),lib
+          pref=root/'var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist'
+          obj=plistlib.loads(pref.read_bytes())
+          items=obj['items']
+          assert items[23]['key']=='pinEnable'
+          assert items[26]['key']=='emailRemote'
+          assert items[29]['key']=='sendEmail'
+          assert items[36]['key']=='emailPassword'
+          assert not any(x.get('key') in ('sendSMS','smsRemote','firstNumber','secondNumber') for x in items)
+          baseline=list(items)
+          domain='com.elias.no2theft3'
+          extras=[
+            {'cell':'PSGroupCell','label':'SMS Settings',
+             'footerText':'Original No2Theft SMS settings. Use Apply Changes after editing. Phone numbers may include +44.'},
+            {'cell':'PSSwitchCell','label':'Send SMS Alerts','key':'sendSMS','defaults':domain},
+            {'cell':'PSEditTextCell','label':'SMS Number 1','key':'firstNumber','defaults':domain,'placeholder':'+447123456789'},
+            {'cell':'PSEditTextCell','label':'SMS Number 2','key':'secondNumber','defaults':domain,'placeholder':'Optional second number'},
+            {'cell':'PSSwitchCell','label':'SMS Remote Command','key':'smsRemote','defaults':domain}
+          ]
+          idx=37
+          items[idx:idx]=extras
+          assert items[:idx]==baseline[:idx] and items[idx+len(extras):]==baseline[idx:]
+          pref.write_bytes(plistlib.dumps(obj,fmt=plistlib.FMT_XML,sort_keys=False))
+          assert not (root/'var/jb/Library/PreferenceBundles/N2TSMSNumbers.bundle').exists()
+          assert not list(root.rglob('N2TSMSNumbers.plist'))
           ctrl=root/'DEBIAN/control'
-          text=ctrl.read_text()
-          text,n=re.subn(r'^Version:.*$', 'Version: 1.3.5+integrated2',text,count=1,flags=re.M)
+          txt=ctrl.read_text()
+          txt,n=re.subn(r'^Version:.*$', 'Version: 1.3.5+integrated3',txt,count=1,flags=re.M)
           assert n==1
-          text,n=re.subn(r'^Description:.*(?:\n [^\n]*)*',
-               'Description: No2Theft iOS 16 integrated test build.\n Original stable PIN, email, SMS sender and alarm preserved.\n Adds corrected GPS, photo exception guard and a two-number submenu.',text,count=1,flags=re.M)
+          txt,n=re.subn(r'^Description:.*(?:\n [^\n]*)*',
+            'Description: No2Theft Enhanced experimental SMS Settings fix.\n Preserves original PIN, email, SMS sending, alarm, GPS and SOS components.\n Includes corrected SMS GPS and Photo Crash Guard; exposes original SMS settings inline without a secondary preferences bundle.',
+            txt,count=1,flags=re.M)
           assert n==1
           addons=('uk.551.no2theft.smslocationfix','uk.551.no2theft.photocrashguard','uk.551.no2theft.smsnumbersprefs')
           for field in ('Conflicts','Replaces'):
-              match=re.search(r'^'+field+r':\s*(.*)$',text,re.M)
+              match=re.search(r'^'+field+r':\s*(.*)$',txt,re.M)
               values=[v.strip() for v in match.group(1).split(',')] if match else []
-              values.extend(p for p in addons if p not in values)
+              values.extend(x for x in addons if x not in values)
               line=field+': '+', '.join(values)
-              if match: text=text[:match.start()]+line+text[match.end():]
-              else: text=text.rstrip()+'\n'+line+'\n'
-          ctrl.write_text(text.rstrip()+'\n')
-          # Original payload must be IDENTICAL except this appended navigation entry.
-          run('dpkg-deb','-x','stable.deb','stable-extract')
-          base=Path('stable-extract')
-          allowed='var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist'
-          for p in base.rglob('*'):
+              if match: txt=txt[:match.start()]+line+txt[match.end():]
+              else: txt=txt.rstrip()+'\n'+line+'\n'
+          ctrl.write_text(txt.rstrip()+'\n')
+          run('dpkg-deb','-x','stable.deb','stable-check')
+          original=Path('stable-check')
+          permitted='var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist'
+          for p in original.rglob('*'):
               if not p.is_file():continue
-              rel=p.relative_to(base)
-              if rel.as_posix()==allowed:continue
-              assert (root/rel).read_bytes()==p.read_bytes(), 'Modified stable payload '+str(rel)
-          assert len(plistlib.loads(prefs.read_bytes())['items'])==len(old_entries)+2
-          assert plistlib.loads(prefs.read_bytes())['items'][:-2]==old_entries
-          out='No2Theft-Enhanced-v1.3.5-Integrated-v2-TEST.deb'
+              rel=p.relative_to(original)
+              if rel.as_posix()==permitted: continue
+              assert (root/rel).read_bytes()==p.read_bytes(),str(rel)
+          for hook in ('N2TSMSLocationFix','N2TPhotoCrashGuard'):
+              d=root/'var/jb/Library/MobileSubstrate/DynamicLibraries'
+              assert (d/(hook+'.dylib')).is_file()
+              assert (d/(hook+'.plist')).is_file()
+          out='No2Theft-Enhanced-v1.3.5-Integrated-v3-SMS-Settings-TEST.deb'
           run('dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),out)
-          subprocess.run(['dpkg-deb','-I',out],check=True)
-          print('PASS: original stable payload unmodified except 2 appended Settings rows')
-          print('PASS: isolated two-number controller, GPS and Photo Guard in one package')
+          print('PASS: Original stable payload preserved except English Settings plist')
+          print('PASS: PIN and email indexes unchanged; all 4 existing SMS keys included')
+          print('PASS: Two hooks and only one Settings entry')
           PY
-          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v2-TEST.deb
+          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v3-SMS-Settings-TEST.deb
       - uses: actions/upload-artifact@v4
         with:
-          name: No2Theft-Integrated-v2-TEST
-          path: No2Theft-Enhanced-v1.3.5-Integrated-v2-TEST.deb
+          name: No2Theft-Integrated-v3-SMS-Settings-TEST
+          path: No2Theft-Enhanced-v1.3.5-Integrated-v3-SMS-Settings-TEST.deb
           if-no-files-found: error
