@@ -36,6 +36,7 @@ jobs:
           assert n==1
           file.write_text(new)
           PY
+          chmod 0755 package/DEBIAN
           dpkg-deb --root-owner-group -Zgzip -z9 --build package No2Theft-Enhanced-v1.3.5.deb
           mkdir original_files
           dpkg-deb -x original.deb original_files
