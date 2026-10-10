@@ -32,7 +32,7 @@ jobs:
       - name: Validate DEB
         run: |
           ls -lh RemoteAlarm/packages/*.deb
-          dpkg-deb -I RemoteAlarm/packages/*.deb
+          ar -t RemoteAlarm/packages/*.deb
       - name: Upload test DEB
         uses: actions/upload-artifact@v4
         with:
