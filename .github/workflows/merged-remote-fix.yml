@@ -1,0 +1,37 @@
+name: Build merged remote helper v1.3.4
+on:
+  push:
+    branches:
+      - no2theft-merged-remote-reliability
+    paths:
+      - 'RemoteAlarm/**'
+      - '.github/workflows/merged-remote-fix.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Randomblock1/theos-action@v1
+        with:
+          theos-src: https://github.com/theos/theos
+          theos-sdks: https://github.com/theos/sdks
+      - name: Generate inject filter
+        working-directory: RemoteAlarm
+        run: |
+          python3 - <<'PY'
+          import plistlib
+          with open('N2TRemoteAlarm.plist','wb') as f:
+              plistlib.dump({'Filter':{'Bundles':['com.apple.springboard']}},f)
+          PY
+      - name: Build rootless arm64 and arm64e
+        working-directory: RemoteAlarm
+        run: make clean package FINALPACKAGE=1
+      - name: Upload compiled helper
+        uses: actions/upload-artifact@v4
+        with:
+          name: N2TRemoteAlarm-merged-reliability
+          path: RemoteAlarm/packages/*.deb
+          if-no-files-found: error
