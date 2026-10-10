@@ -1,41 +1,22 @@
-# No2Theft iOS 16 GPS location add-on — experimental
+# No2Theft iOS 16 — GPS Link Fix (experimental)
 
-**Source-only at present; it has not been compiled or tested on an iPhone.**
+This project produces a rootless Dopamine iOS 16 tweak that uses CoreLocation to replace the **Google Maps link** in No2Theft alarm emails. It keeps the known-good Test 4 Gmail sender, recipients, original email text, photos, and alarm code unchanged.
 
-The companion tweak intercepts No2Theft's `ipinfo.io` lookup in the AFNetworking email path and substitutes a GPS-only result from the `INTULocationManager` class already bundled with No2Theft.
+## Current test: GPS 4 (no accuracy or age filters)
 
-- It accepts a GPS fix only if its coordinates are valid, its reported horizontal accuracy is **30 m or better**, and its timestamp is **no more than 20 seconds old**.
-- It waits up to **12 seconds** for a location.
-- It **does not fall back to IP geolocation** once interception is active.
-- With no qualifying GPS fix, the email's coordinate field reads `GPS unavailable`, rather than presenting a misleading IP position.
-- The original Email Fix, Gmail settings, recipient, photograph and email wording are untouched. Install as a *separate* package.
+The outgoing email intercept obtains a location through the INTULocationManager class already in No2Theft.
 
-## Build and test
+- It requests the highest GPS accuracy available.
+- It accepts **any valid GPS coordinates iOS returns**, without filtering by reported metres of accuracy, GPS reading age, or location provider status.
+- It waits up to approximately 24 seconds so an email won't hang indefinitely if location services cannot supply coordinates.
+- It replaces only the existing Google Maps URL; if there are no coordinates at all, the email says GPS location unavailable (with a short diagnostic reason).
+- It never substitutes IP-based coordinates in the map URL. However, the legacy City/Region/Country and public IP text fields remain IP-derived for now.
+- The source lives on the `gps-test` branch. The CI build outputs a **GPS add-on**, which can be merged with an owned, working Email Fix DEB using `scripts/make-combined-deb.sh` to produce one Sileo package (version `1.1+smtp-test4+gps4`).
 
-Use the manual GitHub Actions workflow on the default branch to build the `gps-test` branch, then download its artifact and install the generated rootless DEB **alongside** No2Theft iOS 16 (Email Fix). Alternatively, use a configured macOS Theos rootless toolchain and run `make clean package FINALPACKAGE=1`.
+**Limitations:** Source compilation succeeded, but the new GPS location link has **not yet been confirmed on a physical device**. Since age and accuracy filters are disabled as requested, any location returned may be old or approximate; CoreLocation cannot guarantee a truly current or precise fix. The code also still relies on No2Theft's location authorization in SpringBoard, which can differ from Google Maps' authorization.
 
-**Important limitations:** This add-on has no on-device validation yet. Hooks may not attach if AFNetworking or INTULocationManager have not loaded before its constructor runs, in which case the original IP email path may remain active. No2Theft might have other email paths not intercepted here. Verify the source of every location alert before relying on this tweak, and keep an uninstall/recovery plan given prior Safe Mode and passcode lockout reports. Do not deliberately enter incorrect passcodes to test.
+## Recovery
 
-**Privacy:** This repository must not contain the original No2Theft binary, the SMTP password, account details or personal location logs.
+A prior GPS implementation that fabricated an AFNetworking reply triggered SpringBoard Safe Mode on an iPhone XS Max, and should not be reused. Keep a backup of the known-good Email Fix Test 4 and test only with a safe trigger; do not deliberately enter wrong lock-screen passcodes.
 
-## Single Sileo package (Email + GPS Fix)
-
-For personal testing, you can combine an **already working Email Fix DEB** and the generated **GPS add-on DEB** into one installable package using:
-
-```bash
-bash scripts/make-combined-deb.sh No2Theft-iOS16-Email-Fix-rootless.deb No2Theft-iOS16-GPS-Only-Experimental-rootless.deb
-```
-
-The result is titled `No2Theft iOS 16 (Email + GPS Fix)` in Sileo and retains the existing No2Theft package identifier and preferences. It declares a conflict/replacement with the separately installed GPS add-on so the older add-on must be removed during installation. Both compiled dylibs remain exactly unchanged; this is a **single package**, not a fully merged binary.
-
-The repository does not distribute the underlying No2Theft binary, which must be supplied separately by its owner. The GPS add-on is experimental and has not yet been validated to produce a precise live GPS pin on a physical iOS 16 device. Avoid passcode-triggered tests given the prior lockout.
-
-## GPS Link Fix Test 2 (2026-10-10)
-
-The earlier GPS Test 1 intercepted AFNetworking's IPInfo request and fabricated a response, and was observed to enter Safe Mode on an iPhone XS Max. **Do not use Test 1.**
-
-Test 2 changes the implementation to hook the existing SMTP message's `send` selector, request a fresh CoreLocation position, and replace only the Google Maps coordinate URL in the outgoing message body. The original Gmail SMTP and alarm binaries remain unchanged in the combined package.
-
-A GPS position must be at most 20 seconds old and have horizontal accuracy of at most 30 m. If it is unavailable after approximately 13 seconds, the link becomes `GPS location unavailable`; Test 2 never inserts a guessed IP coordinate into that map URL when its hook runs.
-
-**Not yet verified on a phone.** The original IP lookup and City/Region/Country fields remain unchanged in Test 2; only the map URL is targeted. Test using a safe alarm trigger, not failed passcodes. Review any crash logs before further changes.
+This GitHub repository hosts companion source only, never Gmail passwords, user preferences, private location logs, or No2Theft's original proprietary binary.
