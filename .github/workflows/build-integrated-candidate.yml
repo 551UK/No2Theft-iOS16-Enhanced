@@ -12,6 +12,8 @@ jobs:
         with:
           theos-src: https://github.com/theos/theos
           theos-sdks: https://github.com/theos/sdks
+      - name: Install Debian package tools
+        run: brew install dpkg
       - name: Remove persistent development diagnostics from working copies
         shell: bash
         run: |
