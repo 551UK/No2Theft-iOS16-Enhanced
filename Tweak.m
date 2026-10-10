@@ -18,13 +18,13 @@ static void (*priorSend)(id, SEL);
 static NSRegularExpression *mapPattern;
 static NSString *const key = @"kSKPSMTPPartMessageKey";
 
-static BOOL isFresh(CLLocation *loc) {
+// Reject only unusable coordinates, never by age or horizontal accuracy.
+static BOOL isValidCoordinate(CLLocation *loc) {
     if (!loc) return NO;
     CLLocationCoordinate2D c = loc.coordinate;
-    if (!CLLocationCoordinate2DIsValid(c) || !isfinite(c.latitude) || !isfinite(c.longitude)) return NO;
-    if (loc.horizontalAccuracy < 0 || loc.horizontalAccuracy > 50.0) return NO;
-    NSTimeInterval seconds = [[NSDate date] timeIntervalSinceDate:loc.timestamp];
-    return isfinite(seconds) && seconds >= -2.0 && seconds <= 45.0;
+    return CLLocationCoordinate2DIsValid(c) &&
+           isfinite(c.latitude) && isfinite(c.longitude) &&
+           !(c.latitude == 0.0 && c.longitude == 0.0);
 }
 static NSString *textOf(id value) {
     if ([value isKindOfClass:[NSString class]]) return value;
@@ -46,7 +46,7 @@ static void updateMap(id message, CLLocation *location, NSString *reason) {
     if (![message respondsToSelector:@selector(parts)] || ![message respondsToSelector:@selector(setParts:)]) return;
     NSArray *parts = [message parts];
     if (![parts isKindOfClass:[NSArray class]]) return;
-    NSString *url = isFresh(location)
+    NSString *url = isValidCoordinate(location)
         ? [NSString stringWithFormat:@"https://maps.google.com/maps?q=%.7f,%.7f", location.coordinate.latitude, location.coordinate.longitude]
         : [NSString stringWithFormat:@"GPS location unavailable (%@)", reason ?: @"unknown reason"];
     NSMutableArray *edited = [NSMutableArray arrayWithCapacity:parts.count];
@@ -83,21 +83,9 @@ static void gpsSend(id message, SEL selector) {
             });
         };
 
-        if (![CLLocationManager locationServicesEnabled]) {
-            finish(nil, @"location services disabled"); return;
-        }
-        CLAuthorizationStatus auth = [CLLocationManager authorizationStatus];
-        if (auth == kCLAuthorizationStatusDenied) {
-            finish(nil, @"SpringBoard GPS permission denied"); return;
-        }
-        if (auth == kCLAuthorizationStatusRestricted) {
-            finish(nil, @"location access restricted"); return;
-        }
-        if (auth == kCLAuthorizationStatusNotDetermined) {
-            finish(nil, @"SpringBoard location permission not determined"); return;
-        }
-
-        // Wait longer for a fresh indoor GPS/Wi-Fi fix, never use the IP result.
+        // Let INTULocationManager itself attempt location acquisition.
+        // A different app's authorization status must not block the attempt.
+        // The timeout is only to ensure the alarm email is eventually sent.
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 24 * NSEC_PER_SEC),
                        dispatch_get_main_queue(), ^{ finish(nil, @"24-second GPS timeout"); });
         @try {
@@ -109,25 +97,16 @@ static void gpsSend(id message, SEL selector) {
             if (!manager || ![manager respondsToSelector:@selector(requestLocationWithDesiredAccuracy:timeout:block:)]) {
                 finish(nil, @"GPS request method unavailable"); return;
             }
-            [manager requestLocationWithDesiredAccuracy:4 timeout:22.0
+            [manager requestLocationWithDesiredAccuracy:5 timeout:22.0
                                                   block:^(CLLocation *loc, NSUInteger accuracy, NSUInteger status) {
-                if (isFresh(loc)) {
-                    finish(loc, nil); return;
+                // Always send coordinates supplied by CoreLocation, regardless
+                // of age, accuracy or provider status.
+                if (isValidCoordinate(loc)) {
+                    finish(loc, nil);
+                } else {
+                    finish(nil, [NSString stringWithFormat:@"no GPS coordinates returned (status %lu)",
+                                          (unsigned long)status]);
                 }
-                NSString *reason = nil;
-                switch (status) {
-                    case 1: reason = @"GPS request timed out"; break;
-                    case 2: reason = @"location permission not determined"; break;
-                    case 3: reason = @"location permission denied"; break;
-                    case 4: reason = @"location access restricted"; break;
-                    case 5: reason = @"location services disabled"; break;
-                    case 6: reason = @"GPS provider error"; break;
-                    default: reason = loc ?
-                        [NSString stringWithFormat:@"accuracy %.0f m, reading %.0f seconds old",
-                            loc.horizontalAccuracy, fabs([[NSDate date] timeIntervalSinceDate:loc.timestamp])] :
-                        @"no GPS coordinates returned"; break;
-                }
-                finish(nil, reason);
             }];
         } @catch (NSException *e) { finish(nil, @"GPS request exception"); }
     });
