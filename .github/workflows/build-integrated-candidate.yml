@@ -1,0 +1,110 @@
+name: Build No2Theft Integrated Candidate (experimental)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Randomblock1/theos-action@v1
+        with:
+          theos-src: https://github.com/theos/theos
+          theos-sdks: https://github.com/theos/sdks
+      - name: Remove persistent development diagnostics from working copies
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('SMSLocationFix/Tweak.m')
+          t=p.read_text()
+          a=t.index('static void LogStage(')
+          b=t.index('\nstatic BOOL IsNo2TheftSMS',a)
+          t=t[:a]+'static void LogStage(NSString *stage) { (void)stage; }\n'+t[b:]
+          p.write_text(t)
+          p=Path('PhotoCrashGuard/Tweak.m')
+          t=p.read_text()
+          a=t.index('static void Record(')
+          b=t.index('\nstatic void GuardedTakePicture',a)
+          t=t[:a]+'static void Record(NSString *status,NSString *exceptionName) { (void)status; (void)exceptionName; }\n'+t[b:]
+          t=t.replace('        NSLog(@"[No2Theft Photo Guard] Caught exception during legacy photo capture: %@",\n              exception.name?:@"unknown");\n','')
+          p.write_text(t)
+          PY
+      - name: Compile hooks and isolated preferences controller
+        shell: bash
+        run: |
+          for dir in SMSLocationFix PhotoCrashGuard SMSNumbersPrefs; do
+            (cd "$dir" && make clean package FINALPACKAGE=1)
+          done
+      - name: Fetch verified original stable package
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 --silent --show-error "https://github.com/551UK/No2Theft-iOS16-Enhanced/releases/download/v1.3.5/No2Theft-Enhanced-v1.3.5.deb" -o stable.deb
+          echo "e3d22e1dd8f407eb4c43a67f78b8956779c36f6f2e24d73e39d9e3609066a0ff  stable.deb" | shasum -a 256 -c
+      - name: Assemble one-package candidate and validate
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import subprocess,glob,plistlib,re,shutil
+          from pathlib import Path
+          subprocess.run(['dpkg-deb','-R','stable.deb','assembled'],check=True)
+          root=Path('assembled')
+          for d in ('SMSLocationFix','PhotoCrashGuard','SMSNumbersPrefs'):
+              files=glob.glob(d+'/packages/*.deb')
+              assert len(files)==1,(d,files)
+              tmp=Path('extracted-'+d)
+              subprocess.run(['dpkg-deb','-x',files[0],str(tmp)],check=True)
+              for p in tmp.rglob('*'):
+                  if not p.is_file(): continue
+                  relative=p.relative_to(tmp)
+                  if 'PreferenceLoader/Preferences' in str(relative): continue
+                  dest=root/relative
+                  assert not dest.exists(),f'Payload collision: {relative}'
+                  dest.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copy2(p,dest)
+          prefs=root/'var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist'
+          assert prefs.exists(), 'Original preferences not found'
+          data=plistlib.loads(prefs.read_bytes())
+          items=data['items']
+          assert isinstance(items,list)
+          assert any(x.get('key')=='emailRemote' for x in items)
+          assert not any(x.get('label')=='SMS Recipients' for x in items)
+          # Preserve existing controls; add one isolated submenu.
+          submenu={'cell':'PSLinkCell','label':'SMS Recipients',
+                   'bundle':'N2TSMSNumbers','detail':'N2TSMSNumbersController',
+                   'isController':True}
+          pos=next((i for i,x in enumerate(items) if x.get('label')=='Remote Commands'),len(items))
+          items.insert(pos,submenu)
+          prefs.write_bytes(plistlib.dumps(data,fmt=plistlib.FMT_XML,sort_keys=False))
+          pref_bundle=root/'var/jb/Library/PreferenceBundles/N2TSMSNumbers.bundle'
+          assert pref_bundle.exists(), 'Built SMS settings bundle missing'
+          assert any(x.name=='N2TSMSNumbers' for x in pref_bundle.iterdir()),'Settings executable missing'
+          dylib_dir=root/'var/jb/Library/MobileSubstrate/DynamicLibraries'
+          for name in ('N2TSMSLocationFix','N2TPhotoCrashGuard'):
+              assert (dylib_dir/(name+'.dylib')).exists()
+              assert (dylib_dir/(name+'.plist')).exists()
+          assert not list(root.rglob('N2TSMSNumbers.plist')),'Separate Settings entry accidentally bundled'
+          control=root/'DEBIAN/control'
+          txt=control.read_text()
+          txt,n=re.subn(r'^Version:.*$', 'Version: 1.3.5+integrated1',txt,count=1,flags=re.M)
+          assert n==1
+          txt=re.sub(r'^Description:.*(?:\n [^\n]*)*',
+                     'Description: No2Theft iOS 16 integrated experimental candidate.\n Original stable alarm, PIN, email, GPS and SOS components preserved.\n Adds SMS location correction, photo exception guard and SMS recipient submenu.',txt,count=1,flags=re.M)
+          control.write_text(txt)
+          subprocess.run(['dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),'No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb'],check=True)
+          stable_dir=Path('stable-extract')
+          subprocess.run(['dpkg-deb','-x','stable.deb',str(stable_dir)],check=True)
+          for p in stable_dir.rglob('*'):
+              if not p.is_file():continue
+              rel=p.relative_to(stable_dir)
+              if rel.as_posix()=='var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist':continue
+              assert (root/rel).read_bytes()==p.read_bytes(),f'Changed stable binary/resource: {rel}'
+          print('Verified original payload unchanged except Settings submenu')
+          PY
+          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: No2Theft-Integrated-Candidate-UNTESTED
+          path: No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb
+          if-no-files-found: error
