@@ -1,4 +1,4 @@
-name: Build No2Theft Integrated SMS Settings v3.7 (test)
+name: Build No2Theft Integrated Settings Cleanup v3.8 (test)
 on:
   push:
     branches: [experimental-sms-location-ios16]
@@ -99,12 +99,33 @@ jobs:
           assert items[:idx]==baseline[:idx]
           assert [x.get('key') for x in items[idx+len(extras):]]==[x.get('key') for x in baseline[idx:]]
           assert items[idx+len(extras)].get('label')=='Remote Commands'
+          original_keyed=[(x.get('key'),x.get('cell'),x.get('defaults'),x.get('action')) for x in items if x.get('key')]
+          # Fix the stray help text above Custom Pin: attach to its actual section.
+          assert items[21].get('footerText','').startswith('Assign a pin')
+          assert items[22].get('label')=='Custom Pin'
+          assert items[23].get('key')=='pinEnable' and items[24].get('key')=='pin'
+          items[22]['footerText']='Set a PIN to disarm the alarm instead of Face ID or Touch ID.'
+          del items[21]
+          def group(label):
+              found=[x for x in items if x.get('cell')=='PSGroupCell' and x.get('label')==label]
+              assert len(found)==1,label
+              return found[0]
+          group('SMS Settings')['footerText']='Enter numbers with country codes (such as +44), then tap Apply Changes.'
+          group('Remote Commands')['footerText']='Text your chosen phrase to trigger the alarm. PIN, SOS and email options still apply.'
+          group('GMAIL SMTP')['footerText']='Use Gmail and an app password. No2Theft stores the password unencrypted. Respring after editing.'
+          redundant=[i for i,x in enumerate(items) if x.get('cell')=='PSGroupCell' and not x.get('label') and x.get('footerText','').startswith('SMTP host fixed to smtp.gmail.com.')]
+          assert len(redundant)==1
+          del items[redundant[0]]
+          group('Receiver email address')['footerText']='Enter one or two email addresses for alerts.'
+          group('WiFi networks')['footerText']='Up to five trusted Wi-Fi networks. Leave blank to allow alarms on any network.'
+          assert [(x.get('key'),x.get('cell'),x.get('defaults'),x.get('action')) for x in items if x.get('key')]==original_keyed
+          assert [x.get('key') for x in items if x.get('key') in ('sendSMS','smsRemote','firstNumber','secondNumber')]==['sendSMS','smsRemote','firstNumber','secondNumber']
           pref.write_bytes(plistlib.dumps(obj,fmt=plistlib.FMT_XML,sort_keys=False))
           assert not (root/'var/jb/Library/PreferenceBundles/N2TSMSNumbers.bundle').exists()
           assert not list(root.rglob('N2TSMSNumbers.plist'))
           ctrl=root/'DEBIAN/control'
           txt=ctrl.read_text()
-          txt,n=re.subn(r'^Version:.*$', 'Version: 1.3.5+integrated3.7',txt,count=1,flags=re.M)
+          txt,n=re.subn(r'^Version:.*$', 'Version: 1.3.5+integrated3.8',txt,count=1,flags=re.M)
           assert n==1
           txt,n=re.subn(r'^Description:.*(?:\n [^\n]*)*',
             'Description: No2Theft Enhanced experimental SMS Settings fix.\n Preserves original PIN, email, SMS sending, alarm, GPS and SOS components.\n Includes corrected SMS GPS and Photo Crash Guard; exposes original SMS settings inline without a secondary preferences bundle.',
@@ -131,15 +152,15 @@ jobs:
               d=root/'var/jb/Library/MobileSubstrate/DynamicLibraries'
               assert (d/(hook+'.dylib')).is_file()
               assert (d/(hook+'.plist')).is_file()
-          out='No2Theft-Enhanced-v1.3.5-Integrated-v3.7-SMS-Settings-TEST.deb'
+          out='No2Theft-Enhanced-v1.3.5-Integrated-v3.8-Settings-Cleanup-TEST.deb'
           run('dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),out)
           print('PASS: Original stable payload preserved except English Settings plist')
           print('PASS: Original settings rows unchanged except SMS section now precedes Email settings')
           print('PASS: Two hooks and only one Settings entry')
           PY
-          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v3.7-SMS-Settings-TEST.deb
+          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v3.8-Settings-Cleanup-TEST.deb
       - uses: actions/upload-artifact@v4
         with:
-          name: No2Theft-Integrated-v3.7-SMS-Settings-TEST
-          path: No2Theft-Enhanced-v1.3.5-Integrated-v3.7-SMS-Settings-TEST.deb
+          name: No2Theft-Integrated-v3.8-Settings-Cleanup-TEST
+          path: No2Theft-Enhanced-v1.3.5-Integrated-v3.8-Settings-Cleanup-TEST.deb
           if-no-files-found: error
