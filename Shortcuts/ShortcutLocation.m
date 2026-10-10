@@ -4,6 +4,7 @@
 #import <dlfcn.h>
 #import <CoreLocation/CoreLocation.h>
 #import <unistd.h>
+#import <sys/stat.h>
 #import <math.h>
 
 static NSString * const kResultDirectory = @"/var/mobile/Library/Preferences";
