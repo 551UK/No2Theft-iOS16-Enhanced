@@ -1,0 +1,8 @@
+Package: com.551uk.no2theftremotealarm
+Name: No2Theft Remote Alarm
+Version: 1.3.3
+Architecture: iphoneos-arm64
+Maintainer: 551UK
+Depends: xyz.cypwn.no2theft16
+Section: Tweaks
+Description: Optional remote command alarm addon.
