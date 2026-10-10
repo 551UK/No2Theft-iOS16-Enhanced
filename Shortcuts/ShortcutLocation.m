@@ -103,9 +103,12 @@ static void Record(NSString *status, NSString *url) {
     (void)controller; (void)dialog;
     if (gStatus) return;
     NSError *error = MsgGet(result,@"error");
-    NSNumber *cancelled = MsgGet(result,@"isCancelled");
+    BOOL cancelled = NO;
+    SEL cancelledSel = sel_registerName("isCancelled");
+    if (result && [result respondsToSelector:cancelledSel])
+        cancelled = ((BOOL (*)(id,SEL))objc_msgSend)(result,cancelledSel);
     if (error) gStatus = [NSString stringWithFormat:@"workflow_error_%ld",(long)error.code];
-    else if (cancelled.boolValue) gStatus = @"cancelled";
+    else if (cancelled) gStatus = @"cancelled";
     else {
         gMapsURL = FindURL(result,0);
         gStatus = gMapsURL ? @"success" : (result ? @"no_map_output" : @"no_result");
