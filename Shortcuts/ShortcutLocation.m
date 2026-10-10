@@ -6,12 +6,14 @@
 #import <unistd.h>
 #import <sys/stat.h>
 #import <math.h>
+#import <stdatomic.h>
 
 static NSString * const kResultDirectory = @"/var/mobile/Library/Preferences";
 static NSString *gToken;
 static NSString *gStatus;
 static NSString *gMapsURL;
-static dispatch_semaphore_t gFinished;
+static atomic_bool gWorkflowFinished;
+static atomic_bool gWorkflowStarted;
 
 static id MsgGet(id obj, NSString *key) {
     if (!obj) return nil;
@@ -98,10 +100,11 @@ static void Record(NSString *status, NSString *url) {
 @implementation N2TWorkflowDelegate
 - (void)outOfProcessWorkflowController:(id)controller didStartFromWorkflowReference:(id)reference {
     (void)controller; (void)reference;
+    atomic_store(&gWorkflowStarted,true);
 }
 - (void)outOfProcessWorkflowController:(id)controller didFinishWithResult:(id)result dialogAttribution:(id)dialog {
     (void)controller; (void)dialog;
-    if (gStatus) return;
+    if (atomic_load(&gWorkflowFinished)) return;
     NSError *error = MsgGet(result,@"error");
     BOOL cancelled = NO;
     SEL cancelledSel = sel_registerName("isCancelled");
@@ -113,7 +116,7 @@ static void Record(NSString *status, NSString *url) {
         gMapsURL = FindURL(result,0);
         gStatus = gMapsURL ? @"success" : (result ? @"no_map_output" : @"no_result");
     }
-    dispatch_semaphore_signal(gFinished);
+    atomic_store(&gWorkflowFinished,true);
 }
 @end
 static void SetObj(id o, const char *s, id v) {
@@ -200,9 +203,20 @@ static void RunLocationShortcut(void) {
     NSError *error=nil;
     BOOL accepted=((BOOL(*)(id,SEL,id,id,NSError**))objc_msgSend)(controller,run,descriptor,request,&error);
     if (!accepted) {gStatus=[NSString stringWithFormat:@"request_rejected_%ld",(long)error.code];return;}
-    long rc=dispatch_semaphore_wait(gFinished,dispatch_time(DISPATCH_TIME_NOW,22*NSEC_PER_SEC));
-    if (rc!=0) {
-        gStatus=@"workflow_timeout";
+    // The Get Current Location action requires WFMainThreadResource. A
+    // semaphore blocking this command-line tool's main thread can prevent
+    // WorkflowKit/ActionKit from dispatching progress and completion callbacks.
+    // Keep the run loop alive while the one-shot workflow is in progress.
+    NSDate *deadline=[NSDate dateWithTimeIntervalSinceNow:22.0];
+    while (!atomic_load(&gWorkflowFinished) && [deadline timeIntervalSinceNow]>0) {
+        @autoreleasepool {
+            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.08]];
+        }
+    }
+    if (!atomic_load(&gWorkflowFinished)) {
+        gStatus=atomic_load(&gWorkflowStarted)
+             ? @"workflow_timeout_after_start" : @"workflow_timeout_no_start";
         SEL stop=sel_registerName("stop");
         if ([controller respondsToSelector:stop]) ((void(*)(id,SEL))objc_msgSend)(controller,stop);
     }
@@ -215,7 +229,8 @@ int main(int argc, char **argv) {
         if (token.length<32 || token.length>40 ||
             [[token stringByTrimmingCharactersInSet:allowed] length]!=0) return 2;
         gToken=token;
-        gFinished=dispatch_semaphore_create(0);
+        atomic_init(&gWorkflowFinished,false);
+        atomic_init(&gWorkflowStarted,false);
         gStatus=nil;
         @try { RunLocationShortcut(); }
         @catch (__unused NSException *e) { gStatus=@"workflow_exception"; }
