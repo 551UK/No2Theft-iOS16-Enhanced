@@ -45,12 +45,13 @@ jobs:
           with tarfile.open(fileobj=io.BytesIO(next(v for k,v in members.items() if k.startswith('control.tar'))),mode='r:*') as tf:
               control=next(tf.extractfile(i).read().decode() for i in tf if i.name.lstrip('./')=='control')
           assert 'Package: uk.551.no2theft.smsflowfix' in control,control
-          assert 'Version: 0.1.0' in control,control
+          assert 'Version: 0.1.1' in control,control
+          assert 'uk.551.no2theft.smslocationfix' not in next(x for x in control.splitlines() if x.startswith('Depends:')),control
           print('Standalone SMS-flow test package verified:',debs[0])
           PY
       - name: Upload standalone DEB
         uses: actions/upload-artifact@v4
         with:
-          name: No2Theft-SMS-Flow-Fix-v0.1.0-Test
+          name: No2Theft-SMS-Flow-Fix-v0.1.1-Test
           path: SMSFlowFix/packages/*.deb
           if-no-files-found: error
