@@ -1,0 +1,11 @@
+Package: uk.551.no2theft.smslocationfix
+Name: No2Theft SMS GPS Location Fix (Experimental)
+Version: 0.1.0
+Architecture: iphoneos-arm64
+Maintainer: 551UK
+Author: 551UK
+Section: Tweaks
+Depends: firmware (>= 16.0), xyz.cypwn.no2theft16 (>= 1.3.5)
+Description: Experimental iOS 16 SMS GPS fix for No2Theft Enhanced.
+ Replaces the 0,0 Google Maps link in the original No2Theft alarm SMS with a fresh GPS link using the existing location helper.
+ Installs separately from the stable tweak and retains the original SMS recipient numbers.
