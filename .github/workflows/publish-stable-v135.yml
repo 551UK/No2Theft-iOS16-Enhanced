@@ -1,0 +1,73 @@
+name: Publish stable v1.3.5
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-stable-v135.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve verified original package
+        run: |
+          git fetch --no-tags origin remote-command-location-reply-v1.3.6
+          git show FETCH_HEAD:Assets/No2Theft-Enhanced-v1.3.5-Clean.deb > original.deb
+          echo "e9f95a8ef56234385befb12776af32011c6aca0871b5456b72cbc5a3c7edbfdd  original.deb" | sha256sum -c -
+      - name: Repack only Sileo description
+        run: |
+          dpkg-deb -R original.deb package
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          file=Path('package/DEBIAN/control')
+          contents=file.read_text()
+          desc=("Description: No2Theft Enhanced for iOS 16 (Dopamine rootless).\n"
+                " .\n"
+                " Enhanced features:\n"
+                "  - SMS remote command activates the theft alarm and PIN screen.\n"
+                "  - Optional SOS flashlight while the alarm is active.\n"
+                "  - Fixed Gmail alert emails with security photos.\n"
+                "  - Accurate GPS and Google Maps links in alert emails.\n"
+                "  - Cleaner alert emails without inaccurate IP-location fields.\n")
+          new,n=re.subn(r'^Description:.*\n(?: [^\n]*\n)*',desc,contents,count=1,flags=re.M)
+          assert n==1
+          file.write_text(new)
+          PY
+          dpkg-deb --root-owner-group -Zgzip -z9 --build package No2Theft-Enhanced-v1.3.5.deb
+          mkdir original_files
+          dpkg-deb -x original.deb original_files
+          diff -qr original_files package --exclude=DEBIAN
+          test "$(dpkg-deb -f No2Theft-Enhanced-v1.3.5.deb Version)" = "1.3.5"
+          sha256sum original.deb No2Theft-Enhanced-v1.3.5.deb
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v1.3.5 >/dev/null 2>&1; then
+            gh release upload v1.3.5 No2Theft-Enhanced-v1.3.5.deb --clobber
+          else
+            gh release create v1.3.5 No2Theft-Enhanced-v1.3.5.deb --title "No2Theft Enhanced v1.3.5" --notes "Stable Dopamine iOS 16 release with a shortened Sileo description. Tweak files unchanged."
+          fi
+          gh release view v1.3.5 --json assets --jq '.assets[].name' | grep -Fx 'No2Theft-Enhanced-v1.3.5.deb'
+      - name: Remove old test release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view no2theft-remote-alarm-v1.3.3-test >/dev/null 2>&1; then
+            gh release delete no2theft-remote-alarm-v1.3.3-test --cleanup-tag --yes
+          fi
+      - name: Remove all non-main branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/branches?per_page=100" --paginate --jq '.[].name' | while IFS= read -r branch; do
+            if [ "$branch" != "main" ]; then
+              echo "Removing $branch"
+              gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/heads/$branch" >/dev/null
+            fi
+          done
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches?per_page=100" --jq 'length')" -eq 1
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches?per_page=100" --jq '.[0].name')" = "main"
