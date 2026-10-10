@@ -29,3 +29,13 @@ bash scripts/make-combined-deb.sh No2Theft-iOS16-Email-Fix-rootless.deb No2Theft
 The result is titled `No2Theft iOS 16 (Email + GPS Fix)` in Sileo and retains the existing No2Theft package identifier and preferences. It declares a conflict/replacement with the separately installed GPS add-on so the older add-on must be removed during installation. Both compiled dylibs remain exactly unchanged; this is a **single package**, not a fully merged binary.
 
 The repository does not distribute the underlying No2Theft binary, which must be supplied separately by its owner. The GPS add-on is experimental and has not yet been validated to produce a precise live GPS pin on a physical iOS 16 device. Avoid passcode-triggered tests given the prior lockout.
+
+## GPS Link Fix Test 2 (2026-10-10)
+
+The earlier GPS Test 1 intercepted AFNetworking's IPInfo request and fabricated a response, and was observed to enter Safe Mode on an iPhone XS Max. **Do not use Test 1.**
+
+Test 2 changes the implementation to hook the existing SMTP message's `send` selector, request a fresh CoreLocation position, and replace only the Google Maps coordinate URL in the outgoing message body. The original Gmail SMTP and alarm binaries remain unchanged in the combined package.
+
+A GPS position must be at most 20 seconds old and have horizontal accuracy of at most 30 m. If it is unavailable after approximately 13 seconds, the link becomes `GPS location unavailable`; Test 2 never inserts a guessed IP coordinate into that map URL when its hook runs.
+
+**Not yet verified on a phone.** The original IP lookup and City/Region/Country fields remain unchanged in Test 2; only the map URL is targeted. Test using a safe alarm trigger, not failed passcodes. Review any crash logs before further changes.
