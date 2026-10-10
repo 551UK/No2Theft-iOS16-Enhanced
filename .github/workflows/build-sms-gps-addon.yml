@@ -24,11 +24,37 @@ jobs:
         run: |
           ls -lh SMSLocationFix/packages/*.deb
           for f in SMSLocationFix/packages/*.deb; do
-            test "$(dpkg-deb -f "$f" Package)" = "uk.551.no2theft.smslocationfix"
-            test "$(dpkg-deb -f "$f" Version)" = "0.1.0"
-            dpkg-deb --contents "$f"
-            dpkg-deb --contents "$f" | grep -q 'N2TSMSLocationFix.dylib'
-            ! dpkg-deb --contents "$f" | grep -qE 'No2Theft.dylib|ZZNo2TheftOnDemandGPS.dylib'
+            test -s "$f"
+            ar -t "$f" | grep -q 'control.tar'
+            ar -t "$f" | grep -q 'data.tar'
+            python3 - "$f" <<'PY'
+          from pathlib import Path
+          import io, tarfile, sys
+          data=Path(sys.argv[1]).read_bytes()
+          assert data.startswith(b'!<arch>\n')
+          cursor=8
+          members={}
+          while cursor<len(data):
+              hdr=data[cursor:cursor+60]
+              assert len(hdr)==60 and hdr[58:60]==b'\x60\n'
+              name=hdr[:16].decode().strip().rstrip('/')
+              size=int(hdr[48:58].decode().strip())
+              cursor+=60
+              members[name]=data[cursor:cursor+size]
+              cursor+=size+(size%2)
+          d=next(value for key,value in members.items() if key.startswith('data.tar'))
+          c=next(value for key,value in members.items() if key.startswith('control.tar'))
+          with tarfile.open(fileobj=io.BytesIO(d), mode='r:*') as tf:
+              names=[x.name for x in tf]
+          assert any(x.endswith('/N2TSMSLocationFix.dylib') for x in names),names
+          assert any(x.endswith('/N2TSMSLocationFix.plist') for x in names),names
+          assert not any(x.endswith('/No2Theft.dylib') or x.endswith('/ZZNo2TheftOnDemandGPS.dylib') for x in names),names
+          with tarfile.open(fileobj=io.BytesIO(c), mode='r:*') as tf:
+              control=next(tf.extractfile(x).read().decode() for x in tf if x.name.lstrip('./')=='control')
+          assert 'Package: uk.551.no2theft.smslocationfix' in control
+          assert 'Version: 0.1.0' in control
+          print('Validated standalone addon, contents:',names)
+          PY
           done
       - name: Upload experimental DEB only to Actions artifact
         uses: actions/upload-artifact@v4
