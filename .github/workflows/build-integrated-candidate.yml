@@ -1,4 +1,4 @@
-name: Build No2Theft Integrated SMS Settings v3.3 (test)
+name: Build No2Theft Integrated SMS Settings v3.4 (test)
 on:
   push:
     branches: [experimental-sms-location-ios16]
@@ -86,9 +86,9 @@ jobs:
             {'cell':'PSGroupCell','label':'SMS Settings',
              'footerText':'Original No2Theft SMS settings. Use Apply Changes after editing. Phone numbers may include +44.'},
             {'cell':'PSSwitchCell','label':'Send SMS Alerts','key':'sendSMS','defaults':domain},
+            {'cell':'PSSwitchCell','label':'SMS Sends Location On Remote Command','key':'smsRemote','defaults':domain},
             {'cell':'PSEditTextCell','label':'SMS Number 1','key':'firstNumber','defaults':domain,'placeholder':'+447123456789'},
-            {'cell':'PSEditTextCell','label':'SMS Number 2','key':'secondNumber','defaults':domain,'placeholder':'Optional second number'},
-            {'cell':'PSSwitchCell','label':'SMS Sends Location On Remote Command','key':'smsRemote','defaults':domain}
+            {'cell':'PSEditTextCell','label':'SMS Number 2','key':'secondNumber','defaults':domain,'placeholder':'Optional second number'}
           ]
           idx=28
           items[idx:idx]=extras
@@ -98,7 +98,7 @@ jobs:
           assert not list(root.rglob('N2TSMSNumbers.plist'))
           ctrl=root/'DEBIAN/control'
           txt=ctrl.read_text()
-          txt,n=re.subn(r'^Version:.*$', 'Version: 1.3.5+integrated3.3',txt,count=1,flags=re.M)
+          txt,n=re.subn(r'^Version:.*$', 'Version: 1.3.5+integrated3.4',txt,count=1,flags=re.M)
           assert n==1
           txt,n=re.subn(r'^Description:.*(?:\n [^\n]*)*',
             'Description: No2Theft Enhanced experimental SMS Settings fix.\n Preserves original PIN, email, SMS sending, alarm, GPS and SOS components.\n Includes corrected SMS GPS and Photo Crash Guard; exposes original SMS settings inline without a secondary preferences bundle.',
@@ -125,15 +125,15 @@ jobs:
               d=root/'var/jb/Library/MobileSubstrate/DynamicLibraries'
               assert (d/(hook+'.dylib')).is_file()
               assert (d/(hook+'.plist')).is_file()
-          out='No2Theft-Enhanced-v1.3.5-Integrated-v3.3-SMS-Settings-TEST.deb'
+          out='No2Theft-Enhanced-v1.3.5-Integrated-v3.4-SMS-Settings-TEST.deb'
           run('dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),out)
           print('PASS: Original stable payload preserved except English Settings plist')
           print('PASS: Original settings rows unchanged except SMS section now precedes Email settings')
           print('PASS: Two hooks and only one Settings entry')
           PY
-          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v3.3-SMS-Settings-TEST.deb
+          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v3.4-SMS-Settings-TEST.deb
       - uses: actions/upload-artifact@v4
         with:
-          name: No2Theft-Integrated-v3.3-SMS-Settings-TEST
-          path: No2Theft-Enhanced-v1.3.5-Integrated-v3.3-SMS-Settings-TEST.deb
+          name: No2Theft-Integrated-v3.4-SMS-Settings-TEST
+          path: No2Theft-Enhanced-v1.3.5-Integrated-v3.4-SMS-Settings-TEST.deb
           if-no-files-found: error
