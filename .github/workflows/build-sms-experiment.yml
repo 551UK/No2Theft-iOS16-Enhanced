@@ -16,7 +16,7 @@ jobs:
           curl --fail --location --retry 3 --silent --show-error \
             "https://github.com/551UK/No2Theft-iOS16-Enhanced/releases/download/v1.3.5/No2Theft-Enhanced-v1.3.5.deb" \
             --output stable.deb
-          echo "861d4e8f6c50bd03801bbe563bc46e9dd46078403e9e9a561dbdcd0d0b03a10f  stable.deb" | sha256sum --check
+          echo "e3d22e1dd8f407eb4c43a67f78b8956779c36f6f2e24d73e39d9e3609066a0ff  stable.deb" | sha256sum --check
       - name: Restore original SMS controls and repackage
         run: |
           dpkg-deb -R stable.deb package
