@@ -176,7 +176,7 @@ static void RunLocationShortcut(void) {
     SetBool(request,"setAllowsHandoff:",NO);
     SetBool(request,"setDonateInteraction:",NO);
     SetBool(request,"setLogRunEvent:",NO);
-    SetNumber(request,"setOutputBehavior:",0);
+    SetNumber(request,"setOutputBehavior:",2);
     SetNumber(request,"setPresentationMode:",0);
     SetObj(context,"setIdentifier:",[NSString stringWithFormat:@"uk.551.no2theft.shortcutloc.%@",gToken]);
     SetObj(context,"setRootWorkflowIdentifier:",[NSString stringWithFormat:@"uk.551.no2theft.shortcutloc.%@",gToken]);
@@ -185,7 +185,7 @@ static void RunLocationShortcut(void) {
     SetObj(context,"setAutomationType:",@"PersonalAutomation");
     SetObj(context,"setOriginatingBundleIdentifier:",@"com.apple.shortcuts");
     SetBool(context,"setAllowsDialogNotifications:",NO);
-    SetNumber(context,"setOutputBehavior:",0);
+    SetNumber(context,"setOutputBehavior:",2);
     SetNumber(context,"setPresentationMode:",0);
 
     id allocated=NewObject(@"WFOutOfProcessWorkflowController"), controller=nil;
