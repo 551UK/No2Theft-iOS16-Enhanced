@@ -1,5 +1,8 @@
 name: Build No2Theft Integrated Candidate (experimental)
 on:
+  push:
+    branches: [experimental-sms-location-ios16]
+    paths: ['.github/workflows/build-integrated-candidate.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -31,6 +34,36 @@ jobs:
           b=t.index('\nstatic void GuardedTakePicture',a)
           t=t[:a]+'static void Record(NSString *status,NSString *exceptionName) { (void)status; (void)exceptionName; }\n'+t[b:]
           t=t.replace('        NSLog(@"[No2Theft Photo Guard] Caught exception during legacy photo capture: %@",\n              exception.name?:@"unknown");\n','')
+          p.write_text(t)
+          # Keep the existing No2Theft SMS implementation. Expose its four
+          # existing preferences in an independent submenu controller.
+          import plistlib
+          p=Path('SMSNumbersPrefs/SMSNumbers.plist')
+          data=plistlib.loads(p.read_bytes())
+          items=data['items']
+          items[0]['label']='SMS Alerts and Remote Commands'
+          items[0]['footerText']='These are the original No2Theft controls. Restart SpringBoard after changes.'
+          domain='com.elias.no2theft3'
+          items.insert(1,{'cell':'PSSwitchCell','label':'Send SMS Location Alerts',
+                          'key':'sendSMS','defaults':domain,'default':False})
+          items.append({'cell':'PSSwitchCell','label':'SMS Remote Command',
+                        'key':'smsRemote','defaults':domain,'default':False})
+          assert len({x.get('key') for x in items if x.get('key')})==4
+          p.write_bytes(plistlib.dumps(data,fmt=plistlib.FMT_XML,sort_keys=False))
+          p=Path('SMSNumbersPrefs/SMSNumbersController.m')
+          t=p.read_text()
+          old='![key isEqualToString:@"firstNumber"] && ![key isEqualToString:@"secondNumber"]'
+          new='![@[@"firstNumber", @"secondNumber", @"sendSMS", @"smsRemote"] containsObject:key]'
+          assert t.count(old)==2
+          t=t.replace(old,new)
+          old='return [value isKindOfClass:NSString.class] ? value : @"";'
+          new='return ([value isKindOfClass:NSString.class] || [value isKindOfClass:NSNumber.class]) ? value : (([key isEqualToString:@"sendSMS"] || [key isEqualToString:@"smsRemote"]) ? @NO : @"");'
+          assert old in t
+          t=t.replace(old,new)
+          old='if(![value isKindOfClass:NSString.class])return;'
+          new='if(![value isKindOfClass:NSString.class] && ![value isKindOfClass:NSNumber.class])return;'
+          assert old in t
+          t=t.replace(old,new)
           p.write_text(t)
           PY
       - name: Compile hooks and isolated preferences controller
@@ -93,7 +126,14 @@ jobs:
           assert n==1
           txt=re.sub(r'^Description:.*(?:\n [^\n]*)*',
                      'Description: No2Theft iOS 16 integrated experimental candidate.\n Original stable alarm, PIN, email, GPS and SOS components preserved.\n Adds SMS location correction, photo exception guard and SMS recipient submenu.',txt,count=1,flags=re.M)
-          control.write_text(txt)
+          for pkg in ('uk.551.no2theft.smslocationfix','uk.551.no2theft.photocrashguard','uk.551.no2theft.smsnumbersprefs'):
+              pass
+          # The integrated package replaces previously installed standalone add-ons,
+          # avoiding dpkg file-ownership conflicts during an upgrade.
+          conflicts='uk.551.no2theft.smslocationfix, uk.551.no2theft.photocrashguard, uk.551.no2theft.smsnumbersprefs'
+          if 'Conflicts:' not in txt: txt+='\nConflicts: '+conflicts
+          if 'Replaces:' not in txt: txt+='\nReplaces: '+conflicts
+          control.write_text(txt.rstrip()+'\n')
           subprocess.run(['dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),'No2Theft-Enhanced-v1.3.5-Integrated-Candidate.deb'],check=True)
           stable_dir=Path('stable-extract')
           subprocess.run(['dpkg-deb','-x','stable.deb',str(stable_dir)],check=True)
