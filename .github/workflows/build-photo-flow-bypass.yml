@@ -1,0 +1,58 @@
+name: Build No2Theft Photo Workflow Fix v0.2.0 (test)
+on:
+  push:
+    branches: [experimental-sms-location-ios16]
+    paths:
+      - 'PhotoFlowBypass/**'
+      - '.github/workflows/build-photo-flow-bypass.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Randomblock1/theos-action@v1
+        with:
+          theos-src: https://github.com/theos/theos
+          theos-sdks: https://github.com/theos/sdks
+      - name: Build removable arm64 and arm64e rootless tweak
+        working-directory: PhotoFlowBypass
+        run: make clean package FINALPACKAGE=1
+      - name: Verify test package, no original No2Theft code included
+        run: |
+          ls -lh PhotoFlowBypass/packages/*.deb
+          python3 - <<'PY'
+          import io,tarfile
+          from pathlib import Path
+          found=list(Path("PhotoFlowBypass/packages").glob("*.deb"))
+          assert len(found)==1, found
+          data=found[0].read_bytes()
+          assert data.startswith(b'!<arch>\n')
+          pos=8;members={}
+          while pos<len(data):
+              h=data[pos:pos+60]
+              assert len(h)==60 and h[58:60]==bytes([96,10])
+              name=h[:16].decode().strip().rstrip('/')
+              n=int(h[48:58].decode().strip())
+              pos+=60
+              members[name]=data[pos:pos+n]
+              pos+=n+(n%2)
+          with tarfile.open(fileobj=io.BytesIO(next(v for k,v in members.items() if k.startswith('data.tar'))),mode='r:*') as tf:
+              names=[i.name for i in tf]
+          assert any(n.endswith('/N2TPhotoFlowBypass.dylib') for n in names), names
+          assert any(n.endswith('/N2TPhotoFlowBypass.plist') for n in names), names
+          assert not any(n.endswith('/No2Theft.dylib') or n.endswith('/N2TPhotoCrashGuard.dylib') for n in names),names
+          with tarfile.open(fileobj=io.BytesIO(next(v for k,v in members.items() if k.startswith('control.tar'))),mode='r:*') as tf:
+              control=next(tf.extractfile(i).read().decode() for i in tf if i.name.lstrip('./')=='control')
+          assert 'Package: uk.551.no2theft.photocrashguard' in control
+          assert 'Version: 0.2.0' in control
+          print('Verified standalone photo bypass package:', found[0], names)
+          PY
+      - name: Upload test DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: No2Theft-Photo-Workflow-Fix-v0.2.0-Test
+          path: PhotoFlowBypass/packages/*.deb
+          if-no-files-found: error
