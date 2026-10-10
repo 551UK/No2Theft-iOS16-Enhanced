@@ -2,7 +2,7 @@ name: Build merged remote helper v1.3.4
 on:
   push:
     branches:
-      - no2theft-merged-remote-reliability
+      - no2theft-enhanced-v1.3.5-clean
     paths:
       - 'RemoteAlarm/**'
       - '.github/workflows/merged-remote-fix.yml'
