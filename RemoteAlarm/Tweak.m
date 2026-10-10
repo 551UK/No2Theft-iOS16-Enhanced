@@ -8,6 +8,14 @@
 #include <stdint.h>
 #include <string.h>
 
+// The notification and bulletin classes are private to SpringBoard.
+// Declare the selectors so both architecture slices compile under ARC.
+@interface NSObject (N2TPrivateBulletin)
+- (NSString *)sectionIdentifier;
+- (id)bulletin;
+- (NSString *)message;
+@end
+
 // Private entry points from the original No2Theft dylib bundled in
 // No2Theft Enhanced 1.3.2. Kept separate to preserve the known-good package.
 #if defined(__arm64e__)
