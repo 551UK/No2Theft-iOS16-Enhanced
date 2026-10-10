@@ -7,6 +7,7 @@
 #import <signal.h>
 #import <unistd.h>
 #import <math.h>
+#import <stdio.h>
 #import <substrate.h>
 
 extern char **environ;
@@ -32,7 +33,8 @@ static void LogStage(NSString *stage) {
 
 static BOOL IsNo2TheftSMS(NSString *message) {
     return [message containsString:@"Your password has been inputted wrong several times at this location"] ||
-           [message containsString:@"SMS remote action has been received"];
+           [message containsString:@"SMS remote action has been received"] ||
+           [message containsString:@"Your password was inputted wrong several times or might have initiated a remote command"];
 }
 
 static NSRange ZeroMapRange(NSString *message) {
