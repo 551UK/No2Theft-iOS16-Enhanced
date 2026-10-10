@@ -29,7 +29,7 @@ jobs:
           assert len(files)==1,files
           deb=files[0]
           raw=deb.read_bytes()
-          assert raw.startswith(b'!<arch>\\n')
+          assert raw.startswith(b'!<arch>\n')
           pos=8;members={}
           while pos<len(raw):
               head=raw[pos:pos+60]
