@@ -1,4 +1,4 @@
-name: Build experimental No2Theft SMS v1.3.5+sms1
+name: Build No2Theft SMS Settings v1.3.5+sms2 (experimental)
 on:
   push:
     branches: [experimental-sms-location-ios16]
@@ -30,10 +30,10 @@ jobs:
           assert not any(x.get('key')=='sendSMS' for x in items)
           prefs={'defaults':'com.elias.no2theft3','PostNotification':'com.elias.no2theft3.preferences-changed','icon':'Enable.png'}
           fields=[
-            {'cell':'PSGroupCell','label':'SMS Location Alerts','footerText':'Experimental iOS 16 test of the original SMS sender. Sends only to numbers entered below when the original alarm SMS event fires. Carrier charges may apply.'},
-            {'cell':'PSSwitchCell','label':'Send SMS Location','key':'sendSMS','default':False,**prefs},
-            {'cell':'PSEditTextCell','label':'Phone 1:','key':'firstNumber','defaults':'com.elias.no2theft3','detail':'PSDetailController','placeholder':'Mobile number','icon':'Wifsi.png','isNumeric':True},
-            {'cell':'PSEditTextCell','label':'Phone 2:','key':'secondNumber','defaults':'com.elias.no2theft3','detail':'PSDetailController','placeholder':'Mobile number','icon':'Wifsi.png','isNumeric':True},
+            {'cell':'PSGroupCell','label':'SMS Location Alerts','footerText':'Original No2Theft SMS alerts. Add up to two recipient numbers, including international prefixes such as +44. SMS charges may apply.'},
+            {'cell':'PSSwitchCell','label':'Send SMS Location Alerts','key':'sendSMS','default':False,**prefs},
+            {'cell':'PSEditTextCell','label':'SMS Recipient 1','key':'firstNumber','defaults':'com.elias.no2theft3','detail':'PSDetailController','placeholder':'e.g. +447123456789','icon':'Wifsi.png'},
+            {'cell':'PSEditTextCell','label':'SMS Recipient 2','key':'secondNumber','defaults':'com.elias.no2theft3','detail':'PSDetailController','placeholder':'Mobile number','icon':'Wifsi.png','isNumeric':True},
           ]
           index=next(i for i,x in enumerate(items) if x.get('label')=='Remote Commands')
           items[index:index]=fields
@@ -42,32 +42,32 @@ jobs:
           p.write_bytes(plistlib.dumps(data,fmt=plistlib.FMT_XML,sort_keys=False))
           f=Path('package/DEBIAN/control')
           c=f.read_text()
-          c,n=re.subn(r'^Version:.*$','Version: 1.3.5+sms1',c,count=1,flags=re.M)
+          c,n=re.subn(r'^Version:.*$','Version: 1.3.5+sms2',c,count=1,flags=re.M)
           assert n==1
           descr=('Description: No2Theft Enhanced iOS 16 - experimental original SMS support.\n'
                  ' .\n'
                  ' Changes from stable v1.3.5:\n'
-                 '  - Restores the original Send SMS Location switch.\n'
-                 '  - Adds two configurable SMS recipient phone numbers.\n'
+                 '  - Restores Send SMS Location Alerts with two recipients.\n'
+                 '  - Preserves saved recipient numbers and supports +44 input.\n'
                  '  - Restores the original SMS Remote switch.\n'
                  '  - Keeps existing alarm, email, GPS and SOS binaries unchanged.\n'
                  ' .\n'
-                 ' SMS delivery and SMS map accuracy are unverified on iOS 16.\n')
+                 ' Restore the original SMS Settings UI only; SMS behaviour uses the original binary.\n')
           c,n=re.subn(r'^Description:.*\n(?: [^\n]*\n)*',descr,c,count=1,flags=re.M)
           assert n==1
           f.write_text(c)
           PY
           chmod 0755 package/DEBIAN
           chmod g-s package/DEBIAN
-          dpkg-deb --root-owner-group -Zgzip -z9 --build package No2Theft-Enhanced-v1.3.5-SMS-Experimental.deb
-          test "$(dpkg-deb -f No2Theft-Enhanced-v1.3.5-SMS-Experimental.deb Version)" = "1.3.5+sms1"
+          dpkg-deb --root-owner-group -Zgzip -z9 --build package No2Theft-Enhanced-v1.3.5-SMS-Settings-Experimental-v2.deb
+          test "$(dpkg-deb -f No2Theft-Enhanced-v1.3.5-SMS-Settings-Experimental-v2.deb Version)" = "1.3.5+sms2"
           dpkg-deb -x stable.deb original-files
           diff -qr original-files package --exclude=DEBIAN | grep '^Files' | grep 'No2Theft3.plist'
           test "$(diff -qr original-files package --exclude=DEBIAN | wc -l)" -eq 1
-          sha256sum No2Theft-Enhanced-v1.3.5-SMS-Experimental.deb
+          sha256sum No2Theft-Enhanced-v1.3.5-SMS-Settings-Experimental-v2.deb
       - name: Upload separate experimental DEB
         uses: actions/upload-artifact@v4
         with:
-          name: No2Theft-Enhanced-v1.3.5-SMS-Experimental
-          path: No2Theft-Enhanced-v1.3.5-SMS-Experimental.deb
+          name: No2Theft-Enhanced-v1.3.5-SMS-Settings-Experimental-v2
+          path: No2Theft-Enhanced-v1.3.5-SMS-Settings-Experimental-v2.deb
           if-no-files-found: error
