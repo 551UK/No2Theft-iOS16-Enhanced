@@ -8,19 +8,6 @@
 #include <stdint.h>
 #include <string.h>
 
-// Keep a short, non-sensitive on-device diagnostic. Never record messages, PINs or email.
-static void remoteLog(NSString *event) {
-    NSLog(@"[N2T remote merged] %@", event);
-    @try {
-        NSString *path = @"/var/mobile/Library/Logs/No2Theft-RemoteAlarm.log";
-        NSString *line = [NSString stringWithFormat:@"%@ %@\n", [NSDate date], event];
-        NSString *prior = [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] ?: @"";
-        if (prior.length > 12000) prior = [prior substringFromIndex:prior.length - 8000];
-        [[NSFileManager defaultManager] createDirectoryAtPath:[path stringByDeletingLastPathComponent] withIntermediateDirectories:YES attributes:nil error:nil];
-        [[prior stringByAppendingString:line] writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:nil];
-    } @catch (NSException *ex) {}
-}
-
 // The notification and bulletin classes are private to SpringBoard.
 // Declare the selectors so both architecture slices compile under ARC.
 @interface NSObject (N2TPrivateBulletin)
@@ -54,12 +41,10 @@ static BOOL *no2Password;
 static BOOL *no2PinEnable;
 static BOOL *no2SMSRemote;
 static BOOL *no2EmailRemote;
-static BOOL *no2Enable;
 static NSString *__unsafe_unretained *no2TriggerPhrase;
 static void (*priorNotification)(id, SEL, id);
 static CFAbsoluteTime lastRemoteAlarm;
 static BOOL isInstalled;
-static unsigned loggedCallbacks;
 
 static BOOL safeInstruction(uintptr_t offset, uint32_t expected) {
     if (!no2Base) return NO;
@@ -95,7 +80,6 @@ static BOOL originalBinaryAvailable(void) {
     no2PinEnable = (BOOL *)no2Symbol("pinEnable");
     no2SMSRemote = (BOOL *)no2Symbol("smsRemote");
     no2EmailRemote = (BOOL *)no2Symbol("emailRemote");
-    no2Enable = (BOOL *)no2Symbol("enable");
     no2TriggerPhrase = (NSString *__unsafe_unretained *)no2Symbol("triggerPhrase");
     return no2IsRunning && no2Password && no2PinEnable &&
            no2SMSRemote && no2EmailRemote && no2TriggerPhrase;
@@ -122,9 +106,7 @@ static BOOL remotePhraseMatched(id event) {
 }
 
 static void startOriginalAlarm(void) {
-    if (!isInstalled || !no2IsRunning || !no2Base) { remoteLog(@"native alarm prerequisites missing"); return; }
-    if (*no2IsRunning) { remoteLog(@"native alarm already running; no duplicate activation"); return; }
-    remoteLog(@"starting original PIN and siren routines");
+    if (!isInstalled || !no2IsRunning || !no2Base || *no2IsRunning) return;
     // Enter the same state as a failed passcode attempt, rather than
     // playing a second, independent audio player.
     if (no2PinEnable && *no2PinEnable) callOriginal(N2T_PIN_PROMPT);
@@ -137,18 +119,14 @@ static void startOriginalAlarm(void) {
 
 static void interceptedRemoteSMS(id self, SEL selector, id event) {
     BOOL matched = remotePhraseMatched(event);
-    if ((++loggedCallbacks % 40) == 1) remoteLog(@"incoming notification hook active");
     if (priorNotification) priorNotification(self, selector, event);
     if (!matched) return;
-    remoteLog(@"configured remote phrase matched");
     CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
     if (now - lastRemoteAlarm < 5.0) return;
     lastRemoteAlarm = now;
     dispatch_async(dispatch_get_main_queue(), ^{
         @try { startOriginalAlarm(); }
-        @catch (NSException *exception) {
-            remoteLog([NSString stringWithFormat:@"alarm callback exception: %@", exception.name]);
-        }
+        @catch (NSException *exception) { (void)exception; }
     });
 }
 
@@ -158,21 +136,17 @@ static void installRemoteAlarm(unsigned retry) {
         if (!safeInstruction(N2T_NOTIFICATION, N2T_NOTIFY_SIG) ||
             !safeInstruction(N2T_PIN_PROMPT, N2T_PIN_SIG) ||
             !safeInstruction(N2T_ALARM_SOUND, N2T_SOUND_SIG)) {
-            remoteLog(@"original binary fingerprint mismatch; hook not installed");
-            return;
+             return;
         }
         MSHookFunction((uint8_t *)no2Base + N2T_NOTIFICATION,
                        (void *)interceptedRemoteSMS,
                        (void **)&priorNotification);
         isInstalled = priorNotification != NULL;
-        remoteLog([NSString stringWithFormat:@"remote notification hook installed=%d, retry=%u", isInstalled, retry]);
-        if (isInstalled) return;
+         if (isInstalled) return;
     }
     // Never give up solely because No2Theft was loaded late on this device.
     // The timer exists only during startup; once hooked there is no polling.
-    if (retry == 0 || retry == 12 || (retry > 12 && retry % 60 == 0))
-        remoteLog([NSString stringWithFormat:@"waiting for original tweak to load (retry %u)", retry]);
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
+     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
                    dispatch_get_main_queue(), ^{ installRemoteAlarm(retry + 1); });
 }
 
