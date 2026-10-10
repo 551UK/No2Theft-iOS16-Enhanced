@@ -1,0 +1,38 @@
+name: Build No2Theft SMS GPS Add-on (experimental)
+on:
+  push:
+    branches: [experimental-sms-location-ios16]
+    paths:
+      - 'SMSLocationFix/**'
+      - '.github/workflows/build-sms-gps-addon.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Randomblock1/theos-action@v1
+        with:
+          theos-src: https://github.com/theos/theos
+          theos-sdks: https://github.com/theos/sdks
+      - name: Build standalone rootless SMS GPS add-on
+        working-directory: SMSLocationFix
+        run: make clean package FINALPACKAGE=1
+      - name: Validate package is standalone
+        run: |
+          ls -lh SMSLocationFix/packages/*.deb
+          for f in SMSLocationFix/packages/*.deb; do
+            test "$(dpkg-deb -f "$f" Package)" = "uk.551.no2theft.smslocationfix"
+            test "$(dpkg-deb -f "$f" Version)" = "0.1.0"
+            dpkg-deb --contents "$f"
+            dpkg-deb --contents "$f" | grep -q 'N2TSMSLocationFix.dylib'
+            ! dpkg-deb --contents "$f" | grep -qE 'No2Theft.dylib|ZZNo2TheftOnDemandGPS.dylib'
+          done
+      - name: Upload experimental DEB only to Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: No2Theft-SMS-GPS-Addon-v0.1.0-Experimental
+          path: SMSLocationFix/packages/*.deb
+          if-no-files-found: error
