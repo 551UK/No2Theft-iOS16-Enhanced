@@ -44,6 +44,7 @@ jobs:
               names=[m.name for m in archive.getmembers()]
           assert any(n.endswith('/Library/PreferenceBundles/N2TSMSNumbers.bundle/N2TSMSNumbers') for n in names),names
           assert any(n.endswith('/Library/PreferenceBundles/N2TSMSNumbers.bundle/SMSNumbers.plist') for n in names),names
+          assert any(n.endswith('/Library/PreferenceBundles/N2TSMSNumbers.bundle/Info.plist') for n in names),names
           assert any(n.endswith('/Library/PreferenceLoader/Preferences/N2TSMSNumbers.plist') for n in names),names
           assert not any(n.endswith('/No2Theft3.plist') or n.endswith('/No2Theft.dylib') or n.endswith('/No2Theft.bundle/No2Theft') for n in names),names
           print('Standalone bundle verified; no original No2Theft files changed.')
