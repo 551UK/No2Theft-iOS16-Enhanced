@@ -10,4 +10,4 @@ No2Theft Enhanced adds extra theft protection to jailbroken iPhones running **iO
 
 **Latest stable version:** v1.3.5 · **Made by 551UK**
 
-[Download the DEB from Releases](https://github.com/551UK/No2Theft-iOS16-Fixed/releases/tag/v1.3.5).
+[Download the DEB from Releases](https://github.com/551UK/No2Theft-iOS16-Enhanced/releases/tag/v1.3.5).
