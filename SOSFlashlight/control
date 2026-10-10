@@ -1,0 +1,8 @@
+Package: com.551uk.no2theftsos
+Name: No2Theft Enhanced - SOS Flashlight Helper
+Version: 1.3.2
+Architecture: iphoneos-arm64
+Maintainer: 551UK
+Depends: xyz.cypwn.no2theft16
+Section: Tweaks
+Description: On-demand SOS flashlight pulse during the active No2Theft alarm. Integrate the matching Settings plist switch into the main Enhanced package.
