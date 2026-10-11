@@ -18,6 +18,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p old unpack new
+          chmod 0755 unpack
           gh release download v4.2 -p 'No2Theft-Enhanced-iOS16-v4.2.deb' --dir old --repo "$GITHUB_REPOSITORY"
           cp old/No2Theft-Enhanced-iOS16-v4.2.deb original.deb
           echo '0dadec23d6129b8520831f9ecc914cdffaeaa0cc2c87664ddb708c7f7655a408  original.deb' | sha256sum -c -
