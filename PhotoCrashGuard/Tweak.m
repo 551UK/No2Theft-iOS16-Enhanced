@@ -10,15 +10,9 @@ static void (*originalTakePicture)(BOOL, NSString *);
 static void *sourceHandle;
 static BOOL installed;
 static const char *const photoSymbol="_Z11takepicturebP8NSString";
-static NSString *const statusPath=@"/var/mobile/Library/Preferences/uk.551.no2theft.photoguard.status.plist";
 
-static void Record(NSString *status,NSString *exceptionName) {
-    NSMutableDictionary *item=[@{@"date":[NSDate date],@"stage":status} mutableCopy];
-    if(exceptionName.length && exceptionName.length<120)
-        item[@"exception"]=exceptionName;
-    // No SMS contents, photo contents, GPS or user data are logged.
-    [item writeToFile:statusPath atomically:YES];
-}
+
+static void Record(NSString *status,NSString *exceptionName) { (void)status; (void)exceptionName; }
 
 static void GuardedTakePicture(BOOL isAlarm,NSString *photoName) {
     if(!originalTakePicture)return;
@@ -29,8 +23,6 @@ static void GuardedTakePicture(BOOL isAlarm,NSString *photoName) {
         // old No2Theft takepicture() spins a nested CFRunLoop on SpringBoard.
         // Catch at the original function boundary, not globally.
         Record(@"photo_exception_caught",exception.name?:@"unknown");
-        NSLog(@"[No2Theft Photo Guard] Caught exception during legacy photo capture: %@",
-              exception.name?:@"unknown");
         // The photo for this event may be lost; leave alarms/SMS/GPS alone.
     }
 }
