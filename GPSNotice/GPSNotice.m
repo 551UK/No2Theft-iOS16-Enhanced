@@ -42,11 +42,11 @@
 - (void)layoutSubviews {
     [super layoutSubviews];
     CGRect bounds = self.contentView.bounds;
-    self.notice.frame = CGRectInset(bounds, 18, 8);
+    self.notice.frame = CGRectInset(bounds, 18, 1);
 }
 
 - (CGFloat)preferredHeightForWidth:(CGFloat)width {
-    return 100.0;
+    return 66.0;
 }
 - (CGFloat)preferredHeightForWidth:(CGFloat)width inTableView:(id)tableView {
     return [self preferredHeightForWidth:width];
