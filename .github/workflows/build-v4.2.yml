@@ -14,28 +14,6 @@ jobs:
           theos-sdks: https://github.com/theos/sdks
       - name: Install package utilities
         run: brew install dpkg
-      - name: Remove development diagnostics in build worktree
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          p=Path('SMSLocationFix/Tweak.m')
-          t=p.read_text()
-          a=t.index('static void LogStage(')
-          b=t.index('\nstatic BOOL IsNo2TheftSMS',a)
-          t=t[:a]+'static void LogStage(NSString *stage) { (void)stage; }\n'+t[b:]
-          t=t.replace('static NSString *const statusPath=@"/var/mobile/Library/Preferences/uk.551.no2theft.smslocationfix.status.plist";','')
-          p.write_text(t)
-          p=Path('PhotoCrashGuard/Tweak.m')
-          t=p.read_text()
-          a=t.index('static void Record(')
-          b=t.index('\nstatic void GuardedTakePicture',a)
-          t=t[:a]+'static void Record(NSString *status,NSString *exceptionName) { (void)status; (void)exceptionName; }\n'+t[b:]
-          t=t.replace('static NSString *const statusPath=@"/var/mobile/Library/Preferences/uk.551.no2theft.photoguard.status.plist";','')
-          t=t.replace('        NSLog(@"[No2Theft Photo Guard] Caught exception during legacy photo capture: %@",\n              exception.name?:@"unknown");\n','')
-          assert '[No2Theft Photo Guard] Caught exception' not in t
-          p.write_text(t)
-          PY
       - name: Build only working GPS and Photo Guard fixes
         shell: bash
         run: |
