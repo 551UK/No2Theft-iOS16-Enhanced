@@ -23,14 +23,11 @@ static BOOL gpsInProgress;
 static NSString *recentGPS;
 static NSDate *recentGPSDate;
 
-static NSString *const statusPath=@"/var/mobile/Library/Preferences/uk.551.no2theft.smslocationfix.status.plist";
+
 static NSString *const gpsPath=@"/var/jb/Applications/N2TLocation.app/N2TLocation";
 static NSString *const resultDirectory=@"/var/mobile/Library/Preferences";
 
-static void LogStage(NSString *stage) {
-    // Deliberately exclude sender, phone number, coordinates and SMS body.
-    [@{@"date":[NSDate date],@"stage":stage} writeToFile:statusPath atomically:YES];
-}
+static void LogStage(NSString *stage) { (void)stage; }
 
 static BOOL IsNo2TheftSMS(NSString *message) {
     return [message containsString:@"Your password has been inputted wrong several times at this location"] ||
