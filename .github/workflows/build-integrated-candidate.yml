@@ -1,4 +1,4 @@
-name: Build No2Theft Enhanced iOS16 v4.1 (test)
+name: Build No2Theft Enhanced iOS16 v4.2 Compact Notice (test)
 on:
   push:
     branches: [experimental-sms-location-ios16]
@@ -233,7 +233,7 @@ jobs:
           assert not any(x.get('headerCellClass')=='N2TGPSNoticeCell' for x in items)
           # Keep every original preference/section in order, including PIN/email.
           previous=list(items)
-          items.insert(1,{'cell':'PSGroupCell','headerCellClass':'N2TGPSNoticeCell','height':100})
+          items.insert(1,{'cell':'PSGroupCell','headerCellClass':'N2TGPSNoticeCell','height':66})
           assert items[0]==previous[0] and items[2:]==previous[1:]
           preferences.write_bytes(plistlib.dumps(obj,fmt=plistlib.FMT_XML,sort_keys=False))
           lib=root/'var/jb/Library/MobileSubstrate/DynamicLibraries'
@@ -247,7 +247,7 @@ jobs:
           metadata=root/'DEBIAN/control'
           c=metadata.read_text()
           assert 'Version: 1.3.5+integrated3.9\n' in c
-          c=c.replace('Version: 1.3.5+integrated3.9\n','Version: 1.3.5+integrated4.1\n')
+          c=c.replace('Version: 1.3.5+integrated3.9\n','Version: 1.3.5+integrated4.2\n')
           description=('Description: No2Theft Enhanced iOS16 - Theft Protection.\n'
                        ' - Restored SMS alerts and recipient settings for alarm and remote commands.\n'
                        ' - Real device GPS for email and SMS instead of IP-based location.\n'
@@ -258,7 +258,7 @@ jobs:
           assert count==1
           assert 'experimental' not in description.lower()
           metadata.write_text(c)
-          out='No2Theft-Enhanced-v1.3.5-Integrated-v4.1-Description-TEST.deb'
+          out='No2Theft-Enhanced-v1.3.5-Integrated-v4.2-Compact-Notice-TEST.deb'
           subprocess.run(['dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),out],check=True)
           subprocess.run(['dpkg-deb','-x',out,'recheck4'],check=True)
           final=Path('recheck4/var/jb/Library')
@@ -270,9 +270,9 @@ jobs:
           assert (final/'PreferenceBundles/No2Theft.bundle/No2Theft').read_bytes()==(root/'var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft').read_bytes()
           print('PASS: red header class installed, old settings intact, GPS and photo guard unchanged')
           PY
-          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v4.1-Description-TEST.deb
+          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v4.2-Compact-Notice-TEST.deb
       - uses: actions/upload-artifact@v4
         with:
-          name: No2Theft-Enhanced-iOS16-v4.1-Description-TEST
-          path: No2Theft-Enhanced-v1.3.5-Integrated-v4.1-Description-TEST.deb
+          name: No2Theft-Enhanced-iOS16-v4.2-Compact-Notice-TEST
+          path: No2Theft-Enhanced-v1.3.5-Integrated-v4.2-Compact-Notice-TEST.deb
           if-no-files-found: error
