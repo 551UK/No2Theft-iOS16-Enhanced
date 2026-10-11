@@ -222,7 +222,7 @@ jobs:
           metadata=root/'DEBIAN/control'
           c=metadata.read_text()
           assert 'Version: 1.3.5+integrated3.9\n' in c
-          c=c.replace('Version: 1.3.5+integrated3.9\n','Version: 1.3.5+integrated4.2\n')
+          c=c.replace('Version: 1.3.5+integrated3.9\n','Version: 4.2\n')
           description=('Description: No2Theft Enhanced iOS16 - Theft Protection.\n'
                        ' - Restored SMS alerts and recipient settings for alarm and remote commands.\n'
                        ' - Real device GPS for email and SMS instead of IP-based location.\n'
@@ -232,6 +232,7 @@ jobs:
           c,count=re.subn(r'^Description:.*(?:\n [^\n]*)*',lambda m:description,c,count=1,flags=re.M)
           assert count==1
           assert 'experimental' not in description.lower()
+          assert c.count('Version: 4.2\n')==1
           metadata.write_text(c)
           out='No2Theft-Enhanced-iOS16-v4.2.deb'
           subprocess.run(['dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),out],check=True)
