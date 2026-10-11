@@ -30,7 +30,7 @@
         _notice.font = [UIFont boldSystemFontOfSize:14.0];
         _notice.text = @"OPEN THE NO2THEFT LOCATION APP ON YOUR HOME SCREEN.\n"
                        @"ALLOW LOCATION ACCESS AND ENABLE PRECISE LOCATION "
-                       @"FOR ACCURATE GPS ALERTS.";
+                       @"FOR THE MOST ACCURATE LOCATION IN EMAIL AND SMS ALERTS.";
         _notice.adjustsFontSizeToFitWidth = NO;
         _notice.isAccessibilityElement = YES;
         _notice.accessibilityLabel = _notice.text;
