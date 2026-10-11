@@ -1,8 +1,8 @@
-name: Build No2Theft Enhanced iOS16 Branding v3.9 (test)
+name: Build No2Theft Enhanced iOS16 GPS Notice v4.0 (test)
 on:
   push:
     branches: [experimental-sms-location-ios16]
-    paths: ['.github/workflows/build-integrated-candidate.yml', 'Branding/**']
+    paths: ['.github/workflows/build-integrated-candidate.yml', 'Branding/**', 'GPSNotice/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -42,7 +42,7 @@ jobs:
       - name: Build only working GPS and Photo Guard fixes
         shell: bash
         run: |
-          for dir in SMSLocationFix PhotoCrashGuard; do
+          for dir in SMSLocationFix PhotoCrashGuard GPSNotice; do
             (cd "$dir" && make clean package FINALPACKAGE=1)
           done
       - name: Fetch and validate original stable No2Theft v1.3.5
@@ -60,7 +60,7 @@ jobs:
           def run(*args): subprocess.run(args,check=True)
           root=Path('assembled')
           run('dpkg-deb','-R','stable.deb',str(root))
-          for name in ('SMSLocationFix','PhotoCrashGuard'):
+          for name in ('SMSLocationFix','PhotoCrashGuard','GPSNotice'):
               debs=glob.glob(name+'/packages/*.deb')
               assert len(debs)==1,(name,debs)
               stage=Path('extract-'+name)
@@ -218,8 +218,52 @@ jobs:
           print("PASS: both architectures, unchanged original preference controls, GPS and Photo Guard present")
           PY
           shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v3.9-Branding-TEST.deb
+      - name: Add red precise GPS location notice below 551UK header
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import plistlib,re,subprocess
+          from pathlib import Path
+          root=Path('assembled')
+          preferences=root/'var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist'
+          obj=plistlib.loads(preferences.read_bytes())
+          items=obj['items']
+          assert items[0].get('headerCellClass')=='CLDHeaderCell'
+          assert not any(x.get('headerCellClass')=='N2TGPSNoticeCell' for x in items)
+          # Keep every original preference/section in order, including PIN/email.
+          previous=list(items)
+          items.insert(1,{'cell':'PSGroupCell','headerCellClass':'N2TGPSNoticeCell','height':120})
+          assert items[0]==previous[0] and items[2:]==previous[1:]
+          preferences.write_bytes(plistlib.dumps(obj,fmt=plistlib.FMT_XML,sort_keys=False))
+          lib=root/'var/jb/Library/MobileSubstrate/DynamicLibraries'
+          assert (lib/'N2TGPSNotice.dylib').is_file()
+          filter_plist=plistlib.loads((lib/'N2TGPSNotice.plist').read_bytes())
+          assert filter_plist['Filter']['Bundles']==['com.apple.Preferences']
+          binary=(lib/'N2TGPSNotice.dylib').read_bytes()
+          assert b'N2TGPSNoticeCell' in binary
+          assert b'OPEN THE NO2THEFT LOCATION APP' in binary
+          assert b'PRECISE LOCATION' in binary
+          metadata=root/'DEBIAN/control'
+          c=metadata.read_text()
+          assert 'Version: 1.3.5+integrated3.9\n' in c
+          c=c.replace('Version: 1.3.5+integrated3.9\n','Version: 1.3.5+integrated4.0\n')
+          metadata.write_text(c)
+          out='No2Theft-Enhanced-v1.3.5-Integrated-v4.0-GPS-Notice-TEST.deb'
+          subprocess.run(['dpkg-deb','--root-owner-group','-Zgzip','-z9','--build',str(root),out],check=True)
+          subprocess.run(['dpkg-deb','-x',out,'recheck4'],check=True)
+          final=Path('recheck4/var/jb/Library')
+          final_items=plistlib.loads((final/'PreferenceBundles/No2Theft.bundle/No2Theft3.plist').read_bytes())['items']
+          assert final_items[1]['headerCellClass']=='N2TGPSNoticeCell'
+          assert final_items[2:]==previous[1:]
+          assert (final/'MobileSubstrate/DynamicLibraries/N2TSMSLocationFix.dylib').read_bytes()==(lib/'N2TSMSLocationFix.dylib').read_bytes()
+          assert (final/'MobileSubstrate/DynamicLibraries/N2TPhotoCrashGuard.dylib').read_bytes()==(lib/'N2TPhotoCrashGuard.dylib').read_bytes()
+          assert (final/'PreferenceBundles/No2Theft.bundle/No2Theft').read_bytes()==(root/'var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft').read_bytes()
+          print('PASS: red header class installed, old settings intact, GPS and photo guard unchanged')
+          PY
+          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v4.0-GPS-Notice-TEST.deb
       - uses: actions/upload-artifact@v4
         with:
-          name: No2Theft-Enhanced-iOS16-v3.9-Branding-TEST
-          path: No2Theft-Enhanced-v1.3.5-Integrated-v3.9-Branding-TEST.deb
+          name: No2Theft-Enhanced-iOS16-v4.0-GPS-Notice-TEST
+          path: No2Theft-Enhanced-v1.3.5-Integrated-v4.0-GPS-Notice-TEST.deb
           if-no-files-found: error
