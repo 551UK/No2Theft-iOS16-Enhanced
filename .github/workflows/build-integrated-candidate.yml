@@ -1,8 +1,8 @@
-name: Build No2Theft Integrated Settings Cleanup v3.8 (test)
+name: Build No2Theft Enhanced iOS16 Branding v3.9 (test)
 on:
   push:
     branches: [experimental-sms-location-ios16]
-    paths: ['.github/workflows/build-integrated-candidate.yml']
+    paths: ['.github/workflows/build-integrated-candidate.yml', 'Branding/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -159,8 +159,67 @@ jobs:
           print('PASS: Two hooks and only one Settings entry')
           PY
           shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v3.8-Settings-Cleanup-TEST.deb
+      - name: Change only visible tweak names and re-sign preference bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          PREF="assembled/var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft"
+          python3 Branding/patch_branding.py "$PREF"
+          python3 - <<'PY'
+          from pathlib import Path
+          import plistlib
+          root=Path("assembled")
+          reg=root/"var/jb/Library/PreferenceLoader/Preferences/No2Theft3.plist"
+          data=plistlib.loads(reg.read_bytes())
+          assert data["entry"]["label"]=="No2Theft iOS 16"
+          data["entry"]["label"]="No2Theft Enhanced iOS16"
+          reg.write_bytes(plistlib.dumps(data,fmt=plistlib.FMT_XML,sort_keys=False))
+          control=root/"DEBIAN/control"
+          value=control.read_text()
+          assert "Name: No2Theft Enhanced\n" in value
+          assert "Version: 1.3.5+integrated3.8\n" in value
+          value=value.replace("Name: No2Theft Enhanced\n","Name: No2Theft Enhanced iOS16\n")
+          value=value.replace("Version: 1.3.5+integrated3.8\n","Version: 1.3.5+integrated3.9\n")
+          control.write_text(value)
+          print("PASS: Settings label and package metadata updated, keys untouched")
+          PY
+          if command -v ldid >/dev/null 2>&1; then
+            ldid -S "$PREF"
+          elif [[ -n "$THEOS" ]] && [[ -x "$THEOS/bin/ldid" ]]; then
+            "$THEOS/bin/ldid" -S "$PREF"
+          else
+            echo "ldid not found, cannot safely install the patched preferences binary"
+            exit 1
+          fi
+          dpkg-deb --root-owner-group -Zgzip -z9 --build assembled No2Theft-Enhanced-v1.3.5-Integrated-v3.9-Branding-TEST.deb
+          python3 - <<'PY'
+          import plistlib,subprocess,struct
+          from pathlib import Path
+          subprocess.run(["dpkg-deb","-x","No2Theft-Enhanced-v1.3.5-Integrated-v3.9-Branding-TEST.deb","brandcheck"],check=True)
+          root=Path("brandcheck/var/jb/Library")
+          entry=plistlib.loads((root/"PreferenceLoader/Preferences/No2Theft3.plist").read_bytes())
+          assert entry["entry"]["label"]=="No2Theft Enhanced iOS16"
+          b=(root/"PreferenceBundles/No2Theft.bundle/No2Theft").read_bytes()
+          magic,count=struct.unpack_from(">II",b,0)
+          assert magic==0xcafebabe and count==2
+          for i in range(count):
+              _,subtype,off,size,_=struct.unpack_from(">IIIII",b,8+i*20)
+              width=43 if subtype==0x80000002 else 36
+              for pos,target,expected in [(0x8268,0x8600,b"No2Theft Enhanced iOS16"),(0x8288,0x8620,b"By 551UK")]:
+                  pointer,length=struct.unpack_from("<QQ",b,off+pos+16)
+                  assert pointer & ((1<<width)-1)==target
+                  assert length==len(expected)
+                  assert b[off+target:off+target+length]==expected
+          old=Path("assembled/var/jb/Library/PreferenceBundles/No2Theft.bundle/No2Theft3.plist")
+          new=root/"PreferenceBundles/No2Theft.bundle/No2Theft3.plist"
+          assert old.read_bytes()==new.read_bytes()
+          assert (root/"MobileSubstrate/DynamicLibraries/N2TSMSLocationFix.dylib").exists()
+          assert (root/"MobileSubstrate/DynamicLibraries/N2TPhotoCrashGuard.dylib").exists()
+          print("PASS: both architectures, unchanged original preference controls, GPS and Photo Guard present")
+          PY
+          shasum -a 256 No2Theft-Enhanced-v1.3.5-Integrated-v3.9-Branding-TEST.deb
       - uses: actions/upload-artifact@v4
         with:
-          name: No2Theft-Integrated-v3.8-Settings-Cleanup-TEST
-          path: No2Theft-Enhanced-v1.3.5-Integrated-v3.8-Settings-Cleanup-TEST.deb
+          name: No2Theft-Enhanced-iOS16-v3.9-Branding-TEST
+          path: No2Theft-Enhanced-v1.3.5-Integrated-v3.9-Branding-TEST.deb
           if-no-files-found: error
