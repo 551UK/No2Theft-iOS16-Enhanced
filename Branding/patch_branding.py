@@ -11,7 +11,7 @@ from pathlib import Path
 
 NEW = [
     (0x8268, 0x71F0, b"No2Theft iOS 16", 0x8600, b"No2Theft Enhanced iOS16"),
-    (0x8288, 0x7200, b"by Elias Sfeir", 0x8620, b"By 551UK"),
+    (0x8288, 0x7200, b"by Elias Sfeir", 0x8620, b"By 551UK & Elias Sfeir"),
 ]
 
 def patch(path):
