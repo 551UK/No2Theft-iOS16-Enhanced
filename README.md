@@ -29,6 +29,3 @@ Enhanced theft protection for jailbroken iPhones, retaining the original No2Thef
 
 [Latest v4.2 release](https://github.com/551UK/No2Theft-iOS16-Enhanced/releases/tag/v4.2)
 
-The [earlier stable v1.3.5](https://github.com/551UK/No2Theft-iOS16-Enhanced/releases/tag/v1.3.5) is retained as a rollback option.
-
-Package ID: `xyz.cypwn.no2theft16`.
