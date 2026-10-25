@@ -24,8 +24,3 @@ Enhanced theft protection for jailbroken iPhones, retaining the original No2Thef
 5. Tap **Apply Changes**, respring if prompted, then test an alert. For remote-command email alerts, enable the relevant **Send Email** option under Remote Commands as well.
 
 **Privacy note:** No2Theft stores its Gmail app password without encryption. Use a dedicated app password and revoke it from your Google Account if the phone is lost or the tweak is removed.
-
-## Download
-
-[Latest v4.2 release](https://github.com/551UK/No2Theft-iOS16-Enhanced/releases/tag/v4.2)
-
